@@ -16,6 +16,7 @@ from http.cookies import SimpleCookie
 
 # Configuration
 import config as _cfg
+import setup_wizard as _setup
 
 # Export module (optional — PDF/Word export requires weasyprint + python-docx)
 try:
@@ -3361,6 +3362,18 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         self.end_headers()
         self.wfile.write(pin_html.encode())
 
+    def _check_setup(self):
+        """If setup is needed, redirect to /_setup. Returns True if setup page was served."""
+        if not _setup.needs_setup(_EDITOR_DIR):
+            return False
+        path = self.path.split('?')[0].rstrip('/')
+        if path == '/_setup':
+            return False  # Let the setup route handle it
+        self.send_response(302)
+        self.send_header('Location', '/_setup')
+        self.end_headers()
+        return True
+
     def _serve_login(self, error='', redirect_to=''):
         html = LOGIN_HTML
         html = html.replace('__ERROR_DISPLAY__', 'block' if error else 'none')
@@ -3421,6 +3434,16 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         self.wfile.write(html.encode())
 
     def do_GET(self):
+        # Setup wizard intercept
+        if self._check_setup():
+            return
+        path_check = self.path.split('?')[0].rstrip('/')
+        if path_check == '/_setup' and _setup.needs_setup(_EDITOR_DIR):
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(_setup.SETUP_HTML.encode())
+            return
         path = self.path.split('?')[0].rstrip('/')
 
         # ==================== AUTH MIDDLEWARE ====================
@@ -4160,6 +4183,16 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length)
 
+        # ==================== SETUP ====================
+        if path == '/_setup' and _setup.needs_setup(_EDITOR_DIR):
+            body = json.loads(raw_body) if raw_body else {}
+            result = _setup.handle_setup_post(body, _EDITOR_DIR)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
         # ==================== LOGIN ====================
         if path == '/login' or path == '/login/':
             # Parse form data or JSON
@@ -4722,6 +4755,9 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
 if __name__ == '__main__':
     if '--version' in sys.argv:
         print(f'Asyre File v{__version__}')
+        sys.exit(0)
+    if '--setup' in sys.argv:
+        _setup.cli_setup(_EDITOR_DIR)
         sys.exit(0)
     _load_sessions_from_file()
     start_cleanup_thread()
