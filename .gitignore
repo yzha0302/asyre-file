@@ -1,0 +1,22 @@
+# Data
+data/
+!data/.gitkeep
+
+# Runtime
+config.json
+users.json
+api_tokens.json
+.sessions.json
+activity.jsonl
+shares.json
+avatars/
+*.pyc
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

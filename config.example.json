@@ -1,0 +1,33 @@
+{
+  "_comment": "Asyre File configuration. Copy to config.json and edit.",
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8765,
+    "base_url": ""
+  },
+  "site": {
+    "name": "Asyre File",
+    "language": "en"
+  },
+  "workspace": {
+    "path": "./data",
+    "max_upload_mb": 50
+  },
+  "auth": {
+    "session_timeout_hours": 72,
+    "allow_registration": false
+  },
+  "ai": {
+    "enabled": false,
+    "provider": "anthropic",
+    "api_key": "",
+    "model": "claude-sonnet-4-5-20250514"
+  },
+  "export": {
+    "pdf_enabled": true,
+    "word_enabled": true
+  },
+  "api": {
+    "enabled": true
+  }
+}
