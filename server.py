@@ -3246,6 +3246,44 @@ def get_activity(limit=100, offset=0):
     return result, total
 
 
+# ==================== API TOKEN AUTH ====================
+_TOKENS_PATH = os.path.join(_EDITOR_DIR, 'api_tokens.json')
+
+def _load_api_tokens():
+    if not os.path.exists(_TOKENS_PATH):
+        return []
+    try:
+        with open(_TOKENS_PATH) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return []
+
+def _check_api_token(auth_header):
+    """Check Authorization: Bearer asf_xxx. Returns token entry or None."""
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None
+    token = auth_header[7:].strip()
+    if not token.startswith('asf_'):
+        return None
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    tokens = _load_api_tokens()
+    for t in tokens:
+        if t.get('token_hash') == token_hash:
+            # Update last_used
+            t['last_used'] = time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            try:
+                with open(_TOKENS_PATH, 'w') as f:
+                    json.dump(tokens, f, indent=2)
+            except:
+                pass
+            return t
+    return None
+
+def _has_permission(token_entry, perm):
+    """Check if token has permission (read/write/delete)."""
+    return perm in token_entry.get('permissions', [])
+
+
 class Handler(SimpleHTTPRequestHandler):
     def _json_resp(self, code, data):
         self.send_response(code)
@@ -3438,6 +3476,92 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         if self._check_setup():
             return
         path_check = self.path.split('?')[0].rstrip('/')
+
+        # ==================== API v1 (Token Auth) ====================
+        if path_check.startswith('/api/v1/'):
+            auth = self.headers.get('Authorization', '')
+            token_entry = _check_api_token(auth)
+            if not token_entry:
+                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'})
+                return
+
+            api_path = path_check[8:]  # strip /api/v1/
+
+            if api_path == 'status':
+                self._json_resp(200, {'ok': True, 'version': __version__, 'name': _cfg.get('site.name')})
+                return
+
+            if api_path == 'files' or api_path == 'files/':
+                if not _has_permission(token_entry, 'read'):
+                    self._json_resp(403, {'ok': False, 'error': 'No read permission'}); return
+                qs = parse_qs(urlparse(self.path).query)
+                dir_filter = qs.get('dir', [''])[0]
+                skip = {'.git','node_modules','__pycache__','.cache','.trash','.venv'}
+                result = []
+                base = os.path.join(WORKSPACE, dir_filter) if dir_filter else WORKSPACE
+                if not os.path.normpath(base).startswith(WORKSPACE):
+                    self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
+                for root, dirs, fnames in os.walk(base):
+                    dirs[:] = sorted([d for d in dirs if d not in skip])
+                    for fn in sorted(fnames):
+                        full = os.path.join(root, fn)
+                        rel = os.path.relpath(full, WORKSPACE)
+                        result.append({'path': rel, 'size': os.path.getsize(full), 'modified': int(os.path.getmtime(full))})
+                self._json_resp(200, {'ok': True, 'files': result, 'count': len(result)})
+                return
+
+            if api_path.startswith('files/'):
+                file_rel = url_unquote(api_path[6:])
+                if not _has_permission(token_entry, 'read'):
+                    self._json_resp(403, {'ok': False, 'error': 'No read permission'}); return
+                full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
+                if not full.startswith(WORKSPACE) or not os.path.isfile(full):
+                    self._json_resp(404, {'ok': False, 'error': 'File not found'}); return
+                try:
+                    with open(full, 'r', errors='replace') as f:
+                        content = f.read()
+                    self._json_resp(200, {'ok': True, 'path': file_rel, 'content': content, 'size': len(content)})
+                except Exception as e:
+                    self._json_resp(500, {'ok': False, 'error': str(e)})
+                return
+
+            if api_path.startswith('search'):
+                if not _has_permission(token_entry, 'read'):
+                    self._json_resp(403, {'ok': False, 'error': 'No read permission'}); return
+                qs = parse_qs(urlparse(self.path).query)
+                query = qs.get('q', [''])[0].lower()
+                if not query or len(query) < 2:
+                    self._json_resp(400, {'ok': False, 'error': 'Query too short (min 2 chars)'}); return
+                skip = {'.git','node_modules','__pycache__','.cache','.trash','.venv'}
+                results = []
+                for root, dirs, fnames in os.walk(WORKSPACE):
+                    dirs[:] = [d for d in dirs if d not in skip]
+                    for fn in fnames:
+                        if not fn.endswith(('.md','.txt','.json','.html','.csv','.yaml','.yml','.py','.js','.ts')):
+                            continue
+                        full = os.path.join(root, fn)
+                        rel = os.path.relpath(full, WORKSPACE)
+                        # Search filename
+                        if query in fn.lower():
+                            results.append({'path': rel, 'match': 'filename'})
+                            continue
+                        # Search content
+                        try:
+                            with open(full, 'r', errors='ignore') as f:
+                                content = f.read(50000)
+                            if query in content.lower():
+                                idx = content.lower().index(query)
+                                snippet = content[max(0,idx-40):idx+len(query)+40]
+                                results.append({'path': rel, 'match': 'content', 'snippet': snippet})
+                        except:
+                            pass
+                        if len(results) >= 50:
+                            break
+                self._json_resp(200, {'ok': True, 'results': results, 'count': len(results)})
+                return
+
+            self._json_resp(404, {'ok': False, 'error': 'Unknown API endpoint'})
+            return
         if path_check == '/_setup' and _setup.needs_setup(_EDITOR_DIR):
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -4112,7 +4236,42 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
 
     def do_DELETE(self):
         path = self.path.split('?')[0].rstrip('/')
-        
+        length = int(self.headers.get('Content-Length', 0))
+        raw_body = self.rfile.read(length) if length else b''
+
+        # ==================== API v1 WRITE ====================
+        if path == '/api/v1/files' or path.startswith('/api/v1/files/'):
+            auth = self.headers.get('Authorization', '')
+            token_entry = _check_api_token(auth)
+            if not token_entry:
+                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'}); return
+            file_rel = url_unquote(path[14:]) if len(path) > 14 else ''
+            if not file_rel:
+                self._json_resp(400, {'ok': False, 'error': 'File path required'}); return
+            full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
+            if not full.startswith(WORKSPACE):
+                self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
+
+            if False:  # PUT handled above
+                if not _has_permission(token_entry, 'write'):
+                    self._json_resp(403, {'ok': False, 'error': 'No write permission'}); return
+                body = json.loads(raw_body) if raw_body else {}
+                content = body.get('content', '')
+                os.makedirs(os.path.dirname(full), exist_ok=True)
+                with open(full, 'w') as f:
+                    f.write(content)
+                log_activity('api:' + token_entry.get('name', '?'), 'save', file_rel)
+                self._json_resp(200, {'ok': True, 'path': file_rel})
+            if self.command == 'DELETE':
+                if not _has_permission(token_entry, 'delete'):
+                    self._json_resp(403, {'ok': False, 'error': 'No delete permission'}); return
+                if not os.path.exists(full):
+                    self._json_resp(404, {'ok': False, 'error': 'Not found'}); return
+                entry = trash_item(file_rel)
+                log_activity('api:' + token_entry.get('name', '?'), 'delete', file_rel)
+                self._json_resp(200, {'ok': True, 'trashed': file_rel})
+            return
+
         # Auth check
         if not path.startswith('/s/'):
             session = self._check_auth()
@@ -4150,7 +4309,41 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
     def do_PUT(self):
         path = self.path.split('?')[0].rstrip('/')
         length = int(self.headers.get('Content-Length', 0))
-        body = json.loads(self.rfile.read(length)) if length else {}
+        raw_body = self.rfile.read(length) if length else b''
+        body = json.loads(raw_body) if raw_body else {}
+
+        # ==================== API v1 WRITE ====================
+        if path == '/api/v1/files' or path.startswith('/api/v1/files/'):
+            auth = self.headers.get('Authorization', '')
+            token_entry = _check_api_token(auth)
+            if not token_entry:
+                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'}); return
+            file_rel = url_unquote(path[14:]) if len(path) > 14 else ''
+            if not file_rel:
+                self._json_resp(400, {'ok': False, 'error': 'File path required'}); return
+            full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
+            if not full.startswith(WORKSPACE):
+                self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
+
+            if self.command == 'PUT':
+                if not _has_permission(token_entry, 'write'):
+                    self._json_resp(403, {'ok': False, 'error': 'No write permission'}); return
+                body = json.loads(raw_body) if raw_body else {}
+                content = body.get('content', '')
+                os.makedirs(os.path.dirname(full), exist_ok=True)
+                with open(full, 'w') as f:
+                    f.write(content)
+                log_activity('api:' + token_entry.get('name', '?'), 'save', file_rel)
+                self._json_resp(200, {'ok': True, 'path': file_rel})
+            elif self.command == 'DELETE':
+                if not _has_permission(token_entry, 'delete'):
+                    self._json_resp(403, {'ok': False, 'error': 'No delete permission'}); return
+                if not os.path.exists(full):
+                    self._json_resp(404, {'ok': False, 'error': 'Not found'}); return
+                entry = trash_item(file_rel)
+                log_activity('api:' + token_entry.get('name', '?'), 'delete', file_rel)
+                self._json_resp(200, {'ok': True, 'trashed': file_rel})
+            return
 
         # PUT /api/users/{username} — update user (admin only)
         if path.startswith('/api/users/'):
@@ -4182,6 +4375,32 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         path = self.path.split('?')[0].rstrip('/')
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length)
+
+
+        # API v1: move/rename
+        if path.startswith('/api/v1/files/') and path.endswith('/move'):
+            auth = self.headers.get('Authorization', '')
+            token_entry = _check_api_token(auth)
+            if not token_entry:
+                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'}); return
+            if not _has_permission(token_entry, 'write'):
+                self._json_resp(403, {'ok': False, 'error': 'No write permission'}); return
+            file_rel = url_unquote(path[14:-5])  # strip /api/v1/files/ and /move
+            body = json.loads(raw_body) if raw_body else {}
+            new_path = body.get('to', '').strip()
+            if not file_rel or not new_path:
+                self._json_resp(400, {'ok': False, 'error': 'Missing file path or destination'}); return
+            old_full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
+            new_full = os.path.normpath(os.path.join(WORKSPACE, new_path))
+            if not old_full.startswith(WORKSPACE) or not new_full.startswith(WORKSPACE):
+                self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
+            if not os.path.exists(old_full):
+                self._json_resp(404, {'ok': False, 'error': 'Source not found'}); return
+            os.makedirs(os.path.dirname(new_full), exist_ok=True)
+            os.rename(old_full, new_full)
+            log_activity('api:' + token_entry.get('name', '?'), 'move', file_rel, new_path)
+            self._json_resp(200, {'ok': True, 'from': file_rel, 'to': new_path})
+            return
 
         # ==================== SETUP ====================
         if path == '/_setup' and _setup.needs_setup(_EDITOR_DIR):
