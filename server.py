@@ -1522,11 +1522,10 @@ function submitAnnotations(){
     finally{ta.remove();}
   }
   
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(onSuccess).catch(()=>fallbackCopy(text));
-  }else{
-    fallbackCopy(text);
-  }
+  copyText(text,'Copied '+count+' annotations');
+  annotations=[];
+  refreshAnnotationDisplay();
+  toggleAnnotationMode();
 }
 
 function showToast(msg,bg){
@@ -1989,6 +1988,8 @@ function openFile(path){
     return;
   }
   _previewLocked=false;
+  // Update activeDir from file path
+  const _fileDir=path.lastIndexOf('/')>0?path.substring(0,path.lastIndexOf('/')):'';activeDir=_fileDir;
   fetch(api('api/load')+'?path='+encodeURIComponent(path)).then(r=>r.json()).then(d=>{
     currentFile=path;cm.operation(()=>{cm.setOption('mode',getCMMode(ext));cm.setValue(d.content);cm.clearHistory();});cm.focus();
     addRecent(path);updateFileStats();
@@ -2652,12 +2653,7 @@ function selectShareMode(mode){
 function copyShareLink(){
   const inp=document.getElementById('shareLinkInput');
   inp.select();
-  copyText(inp.value,'Link copied');(()=>{
-    showToast('✅ 链接已复制');
-  }).catch(()=>{
-    document.execCommand('copy');
-    showToast('✅ 链接已复制');
-  });
+  copyText(inp.value,'Link copied');/* clipboard handled by copyText */);
 }
 
 function loadExistingShares(){
@@ -2772,7 +2768,7 @@ function createFolderShare(dirPath){
 function copyFolderShareLink(){
   const inp=document.getElementById('folderShareLinkInput');
   inp.select();
-  copyText(inp.value,'Link copied');(()=>{showToast('✅ 链接已复制');}).catch(()=>{document.execCommand('copy');showToast('✅ 链接已复制');});
+  copyText(inp.value,'Link copied');/*(()=>{showToast('✅ 链接已复制');}).catch(()=>{document.execCommand('copy');showToast('✅ 链接已复制');});
 }
 
 // ==================== EXPORT ====================
@@ -2906,7 +2902,7 @@ async function saveNewCustomSig(){
     const d=await r.json();
     if(d.ok){showToast('✅ 署名已保存');
       // Refresh export dialog to show new sig
-      document.querySelectorAll('.share-dialog').forEach(d=>d.remove());
+      closeModal('exportModal');
       showExportDialog();
     }else{showToast('❌ '+d.error,'var(--red)');}
   }catch(e){showToast('❌ 保存失败','var(--red)');}
@@ -4826,6 +4822,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             self.end_headers()
             self.wfile.write(json.dumps({'ok': True, 'path': rel}).encode())
         elif path == '/api/annotations':
+            if session and session['role'] == 'viewer':
+                self._json_resp(403, {'ok': False, 'error': 'No permission'}); return
             # Save annotations as JSON file
             ts = time.strftime('%Y%m%d-%H%M%S')
             safe_name = body.get('file', 'unknown').replace('/', '_').replace('\\', '_')
