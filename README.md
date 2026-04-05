@@ -48,35 +48,25 @@ Asyre File runs on the same server as your AI agents. It gives you a **browser U
 
 ## How It Works
 
-<!-- TODO: Add GIF demo of the full workflow -->
-<!-- ![Demo](docs/assets/demo-workflow.gif) -->
+<p align="center">
+<img src="docs/assets/dark-mode.png" width="80%" alt="Asyre File">
+</p>
 
 ### 1. AI writes a file → You see it instantly
 
 Your agent creates or updates files via the REST API. Open the browser — the file tree updates in real-time.
 
-<!-- TODO: GIF showing file appearing in tree after API write -->
-<!-- ![Agent writes](docs/assets/demo-agent-write.gif) -->
+
 
 ### 2. You annotate specific lines → Copy to your AI
 
 Select lines, write feedback like "too formal, rewrite conversationally". Click **Copy** — the annotation includes the **full server path** so any AI can find the file.
 
-<!-- TODO: GIF showing annotation workflow -->
-<!-- ![Annotate](docs/assets/demo-annotate.gif) -->
+![Annotate lines](docs/assets/annotate-lines.png)
 
-**What gets copied:**
-```markdown
-# Annotation: /home/ubuntu/data/report.md
+**What gets copied** — full server paths so AI can locate the files:
 
-Date: 2026-04-05T10:30:00Z
-By: Asher
-
----
-**[1] Lines 12-18**
-  The quarterly results demonstrate a significant...
-Feedback: Too formal. Make it conversational, add specific numbers.
-```
+![Annotation copy](docs/assets/annotate-copy.png)
 
 Paste this into Claude, GPT, or any AI — it knows exactly which file and which lines to fix.
 
@@ -84,15 +74,16 @@ Paste this into Claude, GPT, or any AI — it knows exactly which file and which
 
 Select files with **Cmd+Click**, hit **Annotate**, write your feedback, then **Copy** or **Save**.
 
-<!-- TODO: GIF showing multi-select + batch annotate -->
-<!-- ![Batch annotate](docs/assets/demo-batch-annotate.gif) -->
+<p align="center">
+<img src="docs/assets/annotate-batch-a.png" width="48%" alt="Batch Annotate">
+<img src="docs/assets/annotate-batch.png" width="48%" alt="Batch Annotate Result">
+</p>
 
 ### 4. Share with anyone — no account needed
 
 Right-click a file → **Copy link**. Or share an entire folder. Recipients get a clean read-only (or editable) view.
 
-<!-- TODO: GIF showing share link creation -->
-<!-- ![Share](docs/assets/demo-share.gif) -->
+![Share link](docs/assets/share-link.png)
 
 ## Quick Start
 
@@ -159,8 +150,10 @@ Tokens support granular permissions: `read`, `write`, `delete`.
 - Real-time preview with **Mermaid diagrams**, code highlighting, math
 - **Dark & light themes** — everything adapts, including Mermaid and CodeMirror
 
-<!-- TODO: Side-by-side screenshot of dark and light mode -->
-<!-- ![Themes](docs/assets/screenshot-themes.png) -->
+<p align="center">
+<img src="docs/assets/dark-mode.png" width="48%" alt="Dark Mode">
+<img src="docs/assets/light-mode.png" width="48%" alt="Light Mode">
+</p>
 
 ### File Management
 - **File tree** with colored icons per file type
@@ -171,14 +164,23 @@ Tokens support granular permissions: `read`, `write`, `delete`.
 - **Search** across all files
 - **Trash & restore** with admin-only empty
 
-<!-- TODO: GIF showing drag-drop + right-click menu -->
-<!-- ![File management](docs/assets/demo-file-mgmt.gif) -->
+
 
 ### Collaboration
 - **Multi-user auth** — Admin / Editor / Viewer roles
 - **Path-based permissions** — scope each user to specific folders
 - **Share links** — read-only or editable, single file or entire folder
 - **PDF & Word export** with custom signatures and themes (optional: `pip install weasyprint python-docx`)
+
+<p align="center">
+<img src="docs/assets/export-formats.png" width="32%" alt="Export formats">
+<img src="docs/assets/export-pdf.png" width="32%" alt="PDF export">
+<img src="docs/assets/export-word.png" width="32%" alt="Word export">
+</p>
+<p align="center">
+<img src="docs/assets/export-signature.png" width="48%" alt="Signature">
+<img src="docs/assets/export-custom-sig.png" width="48%" alt="Custom signature">
+</p>
 
 ### For AI Workflows
 - **Annotations** — select lines, write feedback, copy with full server paths
