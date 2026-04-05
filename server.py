@@ -2653,7 +2653,7 @@ function selectShareMode(mode){
 function copyShareLink(){
   const inp=document.getElementById('shareLinkInput');
   inp.select();
-  copyText(inp.value,'Link copied');/* clipboard handled by copyText */);
+  copyText(inp.value,'Link copied');
 }
 
 function loadExistingShares(){
@@ -2768,7 +2768,7 @@ function createFolderShare(dirPath){
 function copyFolderShareLink(){
   const inp=document.getElementById('folderShareLinkInput');
   inp.select();
-  copyText(inp.value,'Link copied');/*(()=>{showToast('✅ 链接已复制');}).catch(()=>{document.execCommand('copy');showToast('✅ 链接已复制');});
+  copyText(inp.value,'Link copied');
 }
 
 // ==================== EXPORT ====================
