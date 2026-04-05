@@ -1,0 +1,10 @@
+services:
+  asyre-file:
+    build: .
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    environment:
+      - ASF_WORKSPACE_PATH=/app/data

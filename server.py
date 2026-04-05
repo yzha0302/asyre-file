@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Asyre File — self-hosted markdown workspace for humans and AI agents.
-Version: see __version__
+"""Asyre File - self-hosted markdown workspace for humans and AI agents.
 Originally: Markdown editor v8 — v7 + drag-drop move + reference detection + smart new file.
 Usage:
   python3 server.py [port]              # Full mode (Asher, all files)
@@ -16,16 +15,17 @@ from http.cookies import SimpleCookie
 
 # Configuration
 import config as _cfg
+# Setup wizard
 import setup_wizard as _setup
 
-# Export module (optional — PDF/Word export requires weasyprint + python-docx)
+# Export module (optional)
 try:
     from export import export_pdf, export_word, start_cleanup_thread, get_config
     _HAS_EXPORT = True
 except ImportError:
     _HAS_EXPORT = False
-    def export_pdf(*a, **kw): raise RuntimeError("Export not available. Install: pip install weasyprint python-docx")
-    def export_word(*a, **kw): raise RuntimeError("Export not available. Install: pip install weasyprint python-docx")
+    def export_pdf(*a, **kw): raise RuntimeError("Export not available. pip install weasyprint python-docx")
+    def export_word(*a, **kw): raise RuntimeError("Export not available. pip install weasyprint python-docx")
     def start_cleanup_thread(): pass
     def get_config(): return {}
 
@@ -619,6 +619,17 @@ body{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;background:var(--
 .mermaid-wrap:hover{border-color:var(--accent)}
 .mermaid-wrap .zoom-hint{position:absolute;top:6px;right:8px;font-size:11px;color:var(--dim);opacity:0;transition:opacity .2s}
 .mermaid-wrap:hover .zoom-hint{opacity:1}
+
+/* Mermaid light mode */
+[data-theme="light"] .mermaid-wrap{background:#f6f8fa;border-color:#d0d7de}
+[data-theme="light"] .mermaid-wrap svg rect,[data-theme="light"] .mermaid-wrap svg circle,[data-theme="light"] .mermaid-wrap svg polygon,[data-theme="light"] .mermaid-wrap svg ellipse{fill:#fff!important;stroke:#d0d7de!important}
+[data-theme="light"] .mermaid-wrap svg text,[data-theme="light"] .mermaid-wrap svg tspan{fill:#1f2328!important}
+[data-theme="light"] .mermaid-wrap svg foreignObject div,[data-theme="light"] .mermaid-wrap svg .nodeLabel{color:#1f2328!important}
+[data-theme="light"] .mermaid-wrap svg .cluster rect{fill:#f0f0f0!important;stroke:#e67e22!important}
+[data-theme="light"] .mermaid-wrap svg .edgePath path,[data-theme="light"] .mermaid-wrap svg .flowchart-link{stroke:#0969da!important}
+[data-theme="light"] .mermaid-wrap svg marker path{fill:#0969da!important}
+[data-theme="light"] .mermaid-wrap svg .edgeLabel rect{fill:#f6f8fa!important}
+
 /* Mermaid nuclear: ALL shapes dark, ALL text white */
 .mermaid-wrap svg rect,.mermaid-wrap svg circle,.mermaid-wrap svg polygon{fill:#2d333b!important;stroke:#444c56!important}
 .mermaid-wrap svg foreignObject div,.mermaid-wrap svg foreignObject span,.mermaid-wrap svg .nodeLabel{color:#e6edf3!important}
@@ -664,14 +675,14 @@ body{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;background:var(--
 .ann-sel-btn{position:fixed;z-index:90;background:var(--purple);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap}
 .ann-sel-btn:hover{background:#a371f7}
 /* Annotation list panel */
-.ann-list{max-height:120px;overflow-y:auto;margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
-.ann-list-item{display:flex;align-items:flex-start;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,.04)}
+#annListItems{max-height:100px;overflow-y:auto;margin-top:4px;border-top:1px solid var(--border);padding-top:4px}
+.ann-list-item{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.04)}
 .ann-list-item .ann-range-tag{color:var(--purple);font-weight:600;white-space:nowrap;flex-shrink:0}
-.ann-list-item .ann-comment{color:var(--text);flex:1}
+.ann-list-item .ann-comment{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ann-list-item .ann-del{color:var(--red);cursor:pointer;flex-shrink:0;padding:0 4px}
 
 /* Annotation bottom bar */
-.ann-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:10px 20px;display:flex;flex-direction:column;gap:8px;font-size:13px;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,.15);max-height:40vh;overflow-y:auto}
+.ann-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:8px 16px;display:flex;flex-direction:column;gap:4px;font-size:13px;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,.15)}
 .ann-bar .ann-header{display:flex;align-items:center;gap:12px;width:100%}
 .ann-bar .ann-header .ann-badge{background:var(--purple);color:#fff;font-size:11px;font-weight:600;padding:2px 10px;border-radius:10px}
 .ann-bar .ann-header .ann-hint{color:var(--dim);font-size:11px}
@@ -1090,6 +1101,8 @@ const BASE=(()=>{const p=location.pathname;return p.endsWith('/')?p:p+'/';})();
 function api(ep){return BASE+ep;}
 const FULL_MODE=__FULL_MODE__;
 const SHARE_FILE=__SHARE_FILE__;
+const IS_READONLY=__IS_READONLY__;
+const AUTH_USER=__AUTH_USER__;
 
 // Mobile sidebar toggle
 function toggleMobileSidebar(){
@@ -1235,6 +1248,7 @@ initTheme();
 updateCMTheme(localStorage.getItem('md-editor-theme')||'dark');
 
 let dirty=false,previewTimer=null,currentFile=SHARE_FILE;
+let _previewLocked=false;
 
 // ==================== RECENT FILES ====================
 const RECENT_KEY='md-editor-recent';
@@ -1284,6 +1298,7 @@ let annotations=[];
 let annIdCounter=0;
 
 cm.on('change',()=>{
+  if(_previewLocked)return;
   dirty=true;
   clearTimeout(window._statsTimer);window._statsTimer=setTimeout(updateFileStats,1000);
   document.getElementById('saveBtn').style.color='var(--red)';
@@ -1306,8 +1321,8 @@ cm.on('cursorActivity',()=>{
   const coords=cm.charCoords(to,'page');
   const btn=document.createElement('button');btn.className='ann-sel-btn';btn.id='annSelBtn';
   btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg> '+((endLine-startLine)+1)+'行';
-  btn.style.left=Math.min(coords.left,window.innerWidth-200)+'px';
-  btn.style.top=(coords.bottom+4)+'px';
+  btn.style.left=Math.min(Math.max(10,coords.left),window.innerWidth-200)+'px';
+  btn.style.top=Math.min(coords.bottom+4,window.innerHeight-50)+'px';
   btn.onclick=()=>{removeSelBtn();showRangePopup(startLine,endLine);};
   document.body.appendChild(btn);
 });
@@ -1404,9 +1419,17 @@ function showRangePopup(startLine,endLine,existingAnn){
     '<button class="save" id="annSaveBtn">保存</button>'+
     '</div>';
   
+  // Position popup: near selection start, but always visible
   const coords=cm.charCoords({line:startLine,ch:0},'page');
-  popup.style.left=Math.min(coords.left+60,window.innerWidth-400)+'px';
-  popup.style.top=Math.min(coords.top-20,window.innerHeight-250)+'px';
+  let popLeft=Math.min(coords.left+60,window.innerWidth-400);
+  let popTop=coords.top-20;
+  // If selection is large or popup would be off-screen, center it
+  if(popTop<10||popTop>window.innerHeight-280||(endLine-startLine)>20){
+    popTop=Math.max(60,window.innerHeight/2-150);
+    popLeft=Math.max(20,window.innerWidth/2-190);
+  }
+  popup.style.left=Math.max(10,popLeft)+'px';
+  popup.style.top=Math.max(10,popTop)+'px';
   document.body.appendChild(popup);
   
   const ta=popup.querySelector('textarea');ta.focus();
@@ -1582,8 +1605,17 @@ window.zoomMermaid=function(wrap){
 };
 
 function forceDarkMermaid(container){
-  // Dark color palette — distinguishable but all dark enough for white text
-  const palette=[
+  const isLight=document.documentElement.getAttribute('data-theme')==='light';
+  const palette=isLight?[
+    {fill:'#dbeafe',stroke:'#2563eb'},  // blue
+    {fill:'#ede9fe',stroke:'#7c3aed'},  // purple
+    {fill:'#dcfce7',stroke:'#16a34a'},  // green
+    {fill:'#fef3c7',stroke:'#d97706'},  // amber
+    {fill:'#fce7f3',stroke:'#db2777'},  // pink
+    {fill:'#ccfbf1',stroke:'#0d9488'},  // teal
+    {fill:'#fee2e2',stroke:'#dc2626'},  // red
+    {fill:'#f3f4f6',stroke:'#6b7280'},  // grey
+  ]:[
     {fill:'#1e3a5f',stroke:'#58a6ff'},  // deep blue
     {fill:'#2d1f4e',stroke:'#a371f7'},  // deep purple
     {fill:'#1a3c2e',stroke:'#3fb950'},  // deep green
@@ -1609,39 +1641,36 @@ function forceDarkMermaid(container){
   // Any remaining shapes not inside .node (like standalone rects)
   container.querySelectorAll('rect,circle,polygon,ellipse').forEach(el=>{
     if(el.closest('.node')||el.closest('.flowchart-node')||el.closest('marker'))return;
-    // Cluster/subgraph backgrounds
     if(el.closest('.cluster')){
-      el.style.setProperty('fill','#161b22','important');
-      el.style.setProperty('stroke','#ffa500','important');
+      el.style.setProperty('fill',isLight?'#f0f0f0':'#161b22','important');
+      el.style.setProperty('stroke',isLight?'#d97706':'#ffa500','important');
       return;
     }
     // Edge label backgrounds etc
     if(el.closest('.edgeLabel')){
-      el.style.setProperty('fill','#0d1117','important');
+      el.style.setProperty('fill',isLight?'#f6f8fa':'#0d1117','important');
       el.style.setProperty('stroke','none','important');
       return;
     }
   });
-  // Force all text white
+  const textColor=isLight?'#1f2328':'#e6edf3';
   container.querySelectorAll('text,tspan').forEach(el=>{
-    el.style.setProperty('fill','#e6edf3','important');
+    el.style.setProperty('fill',textColor,'important');
   });
-  // Force foreignObject div text white  
   container.querySelectorAll('foreignObject div, foreignObject span, .nodeLabel').forEach(el=>{
-    el.style.setProperty('color','#e6edf3','important');
+    el.style.setProperty('color',textColor,'important');
   });
-  // Cluster labels orange
+  const clusterLabel=isLight?'#d97706':'#ffa500';
   container.querySelectorAll('.cluster-label .nodeLabel, .cluster-label span').forEach(el=>{
-    el.style.setProperty('color','#ffa500','important');
+    el.style.setProperty('color',clusterLabel,'important');
   });
-  // Edge paths blue
+  const edgeColor=isLight?'#0969da':'#58a6ff';
   container.querySelectorAll('.edgePath path, .flowchart-link').forEach(el=>{
-    el.style.setProperty('stroke','#58a6ff','important');
+    el.style.setProperty('stroke',edgeColor,'important');
     el.style.setProperty('fill','none','important');
   });
-  // Arrow markers
   container.querySelectorAll('marker path').forEach(el=>{
-    el.style.setProperty('fill','#58a6ff','important');
+    el.style.setProperty('fill',edgeColor,'important');
   });
 }
 
@@ -1770,7 +1799,7 @@ function renderTree(node,container,pathPrefix){
       activeDir=dirPath; // track for smart new-file
     };
     // Drop target
-    setupDropTarget(label,dirPath);
+    if(!IS_READONLY&&AUTH_USER&&AUTH_USER.role!=='viewer')setupDropTarget(label,dirPath);
     container.appendChild(d);
     renderTree(node[dir],d.querySelector('.tree-children'),dirPath);
   });
@@ -1822,8 +1851,8 @@ function renderTree(node,container,pathPrefix){
     d.innerHTML=(icon||'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/></svg>')+'<span style="overflow:hidden;text-overflow:ellipsis">'+f.name+'</span>';d.title=f.path;
     d.setAttribute('data-path',f.path);
     d.onclick=()=>{openFile(f.path);closeMobileSidebar();};
-    // Draggable
-    setupDrag(d,f.path);
+    // Draggable (only for editors/admins)
+    if(!IS_READONLY&&AUTH_USER&&AUTH_USER.role!=='viewer')setupDrag(d,f.path);
     container.appendChild(d);
   });
 }
@@ -1883,11 +1912,26 @@ function openFile(path){
   history.replaceState(null,'','#'+encodeURIComponent(path));
   annotations=[];annIdCounter=0;refreshAnnotationDisplay();
   const ext=path.split('.').pop().toLowerCase();
-  const nonMdTypes=['pdf','docx','xlsx','xls','jpg','jpeg','png','gif','webp'];
+  const imgTypes=['jpg','jpeg','png','gif','webp','svg'];
+  if(imgTypes.includes(ext)){
+    // Image: render directly, no API call needed
+    _previewLocked=true;
+    currentFile=path;
+    cm.setValue('');cm.clearHistory();
+    document.getElementById('fname').textContent=path;
+    document.getElementById('saveBtn').style.display='none';
+    dirty=false;
+    revealFileInTree(path);addRecent(path);
+    const previewBtn=document.querySelector('.tabs button:last-child');
+    if(previewBtn)setView('preview-only',previewBtn);
+    const imgUrl=api('api/raw')+'?path='+encodeURIComponent(path);
+    document.getElementById('preview').innerHTML='<div style="text-align:center;padding:20px"><img src="'+imgUrl+'" style="max-width:100%;border-radius:6px;border:1px solid var(--border)" alt="'+path.split('/').pop()+'" onclick="window.open(this.src)"></div>';
+    return;
+  }
+  const nonMdTypes=['pdf','docx','xlsx','xls'];
   if(nonMdTypes.includes(ext)){
-    // Non-markdown file: use preview API
-    // HTML files: render directly in iframe using api() for correct prefix
     if(ext==='html'||ext==='htm'){
+      _previewLocked=true;
       currentFile=path;
       cm.setValue('');cm.clearHistory();
       document.getElementById('fname').textContent=path;
@@ -1902,6 +1946,7 @@ function openFile(path){
       document.getElementById('preview').innerHTML='<iframe src="'+iframeSrc+'" style="width:100%;min-height:80vh;border:1px solid #30363d;border-radius:6px;background:#0D0D0F" onload="try{this.style.height=this.contentDocument.body.scrollHeight+40+\'px\'}catch(e){}"></iframe>';
       return;
     }
+    _previewLocked=true;
     fetch(api('api/preview')+'?path='+encodeURIComponent(path)).then(r=>r.json()).then(d=>{
       currentFile=path;
       cm.setValue('');cm.clearHistory();
@@ -1920,8 +1965,9 @@ function openFile(path){
     });
     return;
   }
+  _previewLocked=false;
   fetch(api('api/load')+'?path='+encodeURIComponent(path)).then(r=>r.json()).then(d=>{
-    currentFile=path;cm.setOption('mode',getCMMode(ext));cm.setValue(d.content);cm.clearHistory();cm.focus();
+    currentFile=path;cm.operation(()=>{cm.setOption('mode',getCMMode(ext));cm.setValue(d.content);cm.clearHistory();});cm.focus();
     addRecent(path);updateFileStats();
     document.getElementById('fname').textContent=path;
     document.getElementById('saveBtn').style.display='';
@@ -1929,7 +1975,9 @@ function openFile(path){
     document.getElementById('status').style.color='var(--dim)';
     dirty=false;
     revealFileInTree(path);
-    renderPreview();
+    // Defer preview render for faster file switching
+    clearTimeout(previewTimer);
+    previewTimer=setTimeout(renderPreview,50);
   });
 }
 
@@ -2193,13 +2241,29 @@ function closeContextMenu(){const m=document.getElementById('ctxMenu');if(m)m.re
 document.addEventListener('mousedown',e=>{if(!e.target.closest('.ctx-menu'))closeContextMenu();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeContextMenu();if(_selectedFiles.size)clearSelection();}});
 
+// Clipboard helper (works on HTTP too)
+function copyText(text,msg){
+  msg=msg||'Copied';
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(text).then(()=>showToast(msg)).catch(()=>_fallbackCopy(text,msg));
+  }else{_fallbackCopy(text,msg);}
+}
+function _fallbackCopy(text,msg){
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.cssText='position:fixed;left:-9999px;top:-9999px;opacity:0';
+  document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');showToast(msg||'Copied');}
+  catch(e){showToast('Copy failed','var(--red)');}
+  finally{ta.remove();}
+}
+
 // Copy relative path
-function copyRelPath(p){navigator.clipboard.writeText(p).then(()=>showToast('Copied: '+p));}
+function copyRelPath(p){copyText(p,'Copied: '+p);}
 
 // Copy shareable link
 function copyFileLink(p){
   const url=location.origin+BASE+'#'+encodeURIComponent(p);
-  navigator.clipboard.writeText(url).then(()=>showToast('Link copied'));
+  copyText(url,'Link copied');
 }
 
 // Download file
@@ -2276,7 +2340,7 @@ function updateSelectionUI(){
       bar=document.createElement('div');bar.className='multi-select-bar';bar.id='multiSelectBar';
       document.body.appendChild(bar);
     }
-    bar.innerHTML='<span style="color:var(--blue);font-weight:600">'+_selectedFiles.size+' selected</span>'
+    bar.innerHTML='<span style="color:var(--blue);font-weight:600">'+_selectedFiles.size+' files</span>'
       +'<button onclick="batchShareSelected()" style="background:var(--blue);color:#000"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share</button>'
       +'<button onclick="copySelectedPaths()" style="background:var(--border);color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy</button>'
       +'<button onclick="batchDeleteSelected()" style="background:var(--red);color:#fff"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg> Delete</button>'
@@ -2286,9 +2350,23 @@ function updateSelectionUI(){
   }
 }
 
+
+// Cmd/Ctrl+Click for multi-select in file tree (not for viewers)
+if(!IS_READONLY&&AUTH_USER&&AUTH_USER.role!=='viewer'){
+  document.querySelector('.tree')?.addEventListener('click',function(e){
+    const fileEl=e.target.closest('.tree-file');
+    if(!fileEl)return;
+    if(e.metaKey||e.ctrlKey){
+      e.preventDefault();e.stopPropagation();
+      const path=fileEl.getAttribute('data-path');
+      if(path)toggleSelectFile(path,fileEl);
+    }
+  },true);
+}
+
 function copySelectedPaths(){
   const paths=Array.from(_selectedFiles).join('\n');
-  navigator.clipboard.writeText(paths).then(()=>showToast('Copied '+_selectedFiles.size+' paths'));
+  copyText(paths,'Copied '+_selectedFiles.size+' paths');
 }
 
 async function batchDeleteSelected(){
@@ -2307,19 +2385,58 @@ async function batchDeleteSelected(){
 }
 
 function batchShareSelected(){
-  // Find common directory
   const paths=Array.from(_selectedFiles);
   if(!paths.length)return;
-  // Get the directory of first file
-  const firstDir=paths[0].substring(0,paths[0].lastIndexOf('/'));
-  // Check if all in same dir
-  const allSameDir=paths.every(p=>p.substring(0,p.lastIndexOf('/'))==firstDir);
-  if(allSameDir&&firstDir){
-    // Use folder share with pre-selected files
-    showFolderShareDialog(firstDir);
-  }else{
-    showToast('Select files from the same folder to share','var(--accent)');
+  // Group by directory
+  const dirMap={};
+  paths.forEach(p=>{
+    const dir=p.substring(0,p.lastIndexOf('/'))||'.';
+    if(!dirMap[dir])dirMap[dir]=[];
+    dirMap[dir].push(p.split('/').pop());
+  });
+  const dirs=Object.keys(dirMap);
+  if(dirs.length>1){
+    showToast('Selected files span multiple folders, sharing first folder only','var(--accent)');
   }
+  const dir=dirs[0];
+  const fileNames=dirMap[dir];
+  // Directly create share link
+  const mode='readonly';
+  openModal('batchShareModal',`
+    <h3 style="margin:0 0 12px;font-size:15px">Share ${fileNames.length} files</h3>
+    <div style="font-size:13px;color:var(--dim);margin-bottom:12px">${dir}/</div>
+    <div style="max-height:150px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:16px;font-size:12px">${fileNames.map(f=>'<div style="padding:2px 0">'+f+'</div>').join('')}</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="bsReadonly" class="xh-card-select sel" onclick="document.getElementById('bsReadonly').classList.add('sel');document.getElementById('bsEditable').classList.remove('sel');window._bsMode='readonly'" style="flex:1;padding:10px;text-align:center">Read-only</button>
+      <button id="bsEditable" class="xh-card-select" onclick="document.getElementById('bsEditable').classList.add('sel');document.getElementById('bsReadonly').classList.remove('sel');window._bsMode='editable'" style="flex:1;padding:10px;text-align:center">Editable</button>
+    </div>
+    <div id="bsLinkArea" style="display:none;margin-bottom:12px">
+      <div class="xh-link-box" style="display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px">
+        <input type="text" id="bsLinkInput" readonly style="flex:1;background:none;border:none;color:var(--blue);font-family:monospace;font-size:12px;outline:none">
+        <button class="xh-btn xh-btn-primary" onclick="copyText(document.getElementById('bsLinkInput').value,'Link copied')" style="padding:4px 10px;font-size:12px">Copy</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="xh-btn xh-btn-ghost" onclick="closeModal('batchShareModal')">Close</button>
+      <button class="xh-btn xh-btn-primary" id="bsCreateBtn" onclick="createBatchShare('${dir==='.'?'':dir}')">Create Link</button>
+    </div>
+  `);
+  window._bsMode='readonly';
+  window._bsFiles=fileNames;
+}
+
+async function createBatchShare(dir){
+  try{
+    const r=await fetch(api('api/share'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:dir||'.',mode:window._bsMode,type:'folder',files:window._bsFiles})});
+    const d=await r.json();
+    if(d.ok){
+      const url=location.origin+BASE+'s/'+d.token;
+      document.getElementById('bsLinkInput').value=url;
+      document.getElementById('bsLinkArea').style.display='';
+      document.getElementById('bsCreateBtn').textContent='Created!';
+      document.getElementById('bsCreateBtn').disabled=true;
+    }else{showToast(d.error||'Failed','var(--red)');}
+  }catch(e){showToast('Failed: '+e.message,'var(--red)');}
 }
 
 // ==================== TRASH SYSTEM ====================
@@ -2452,7 +2569,7 @@ function selectShareMode(mode){
 function copyShareLink(){
   const inp=document.getElementById('shareLinkInput');
   inp.select();
-  navigator.clipboard.writeText(inp.value).then(()=>{
+  copyText(inp.value,'Link copied');(()=>{
     showToast('✅ 链接已复制');
   }).catch(()=>{
     document.execCommand('copy');
@@ -2572,7 +2689,7 @@ function createFolderShare(dirPath){
 function copyFolderShareLink(){
   const inp=document.getElementById('folderShareLinkInput');
   inp.select();
-  navigator.clipboard.writeText(inp.value).then(()=>{showToast('✅ 链接已复制');}).catch(()=>{document.execCommand('copy');showToast('✅ 链接已复制');});
+  copyText(inp.value,'Link copied');(()=>{showToast('✅ 链接已复制');}).catch(()=>{document.execCommand('copy');showToast('✅ 链接已复制');});
 }
 
 // ==================== EXPORT ====================
@@ -2818,7 +2935,6 @@ async function doExport(){
 
 // ==================== SHARE MODE (read-only) ====================
 
-const IS_READONLY=__IS_READONLY__;
 const DEFAULT_VIEW='__DEFAULT_VIEW__';
 if(IS_READONLY){
   cm.setOption('readOnly',true);
@@ -2927,15 +3043,24 @@ function rejectAI(){
 }
 
 // ==================== ADMIN PANEL ====================
-const AUTH_USER=__AUTH_USER__;
 
 
 
 // ==================== FILE UPLOAD ====================
+function getActiveDir(){
+  // Get directory from current file or active folder context
+  if(activeDir)return activeDir;
+  if(currentFile){
+    const idx=currentFile.lastIndexOf('/');
+    return idx>0?currentFile.substring(0,idx):'';
+  }
+  return '';
+}
+
 function triggerUpload(destDir){
+  if(destDir===undefined||destDir===null||destDir==='')destDir=getActiveDir();
   const inp=document.createElement('input');
   inp.type='file';inp.multiple=true;
-  inp.accept='.md,.txt,.html,.htm,.json,.csv,.js,.ts,.py,.css,.xml,.yaml,.yml,.toml,.log,.env,.sh,.sql,.go,.rs,.java,.c,.cpp,.h,.rb,.php,.swift,.kt,.r,.lua,.jpg,.jpeg,.png,.gif,.webp,.svg,.pdf,.docx,.xlsx';
   inp.onchange=()=>{
     if(inp.files.length)uploadFiles(inp.files,destDir);
   };
@@ -2978,13 +3103,7 @@ document.addEventListener('drop',e=>{
   e.preventDefault();
   if(_dropOverlay){_dropOverlay.remove();_dropOverlay=null;}
   if(e.dataTransfer.files.length){
-    // Determine target dir from current file
-    let destDir='';
-    if(currentFile){
-      const idx=currentFile.lastIndexOf('/');
-      if(idx>0)destDir=currentFile.substring(0,idx);
-    }
-    uploadFiles(e.dataTransfer.files,destDir);
+    uploadFiles(e.dataTransfer.files,getActiveDir());
   }
 });
 
@@ -3203,7 +3322,7 @@ SIDEBAR_FULL = '''<div class="sidebar">
 <div class="search" style="display:flex;gap:4px;align-items:center">
 <input type="text" id="searchInput" placeholder="搜索文件..." oninput="filterFiles()" style="flex:1">
 <button onclick="toggleAllFolders()" id="toggleFoldersBtn" style="background:none;color:var(--dim);border:1px solid var(--border);padding:4px 6px;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap" title="展开/收起所有文件夹" title="Toggle folders"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg></button>
-<button onclick="triggerUpload('')" style="background:none;color:var(--dim);border:1px solid var(--border);padding:4px 6px;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap" title="Upload"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
+<button onclick="triggerUpload()" style="background:none;color:var(--dim);border:1px solid var(--border);padding:4px 6px;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap" title="Upload"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
 <button onclick="showNewFileDialog()" style="background:var(--green);color:#fff;border:none;padding:5px 8px;border-radius:4px;font-size:12px;cursor:pointer;white-space:nowrap" title="新建文件"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
 </div>
 <div class="recent-section" id="recentSection" style="display:none"><div class="recent-title"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Recent</div><div id="recentList"></div></div>
@@ -3259,7 +3378,6 @@ def _load_api_tokens():
         return []
 
 def _check_api_token(auth_header):
-    """Check Authorization: Bearer asf_xxx. Returns token entry or None."""
     if not auth_header or not auth_header.startswith('Bearer '):
         return None
     token = auth_header[7:].strip()
@@ -3269,7 +3387,6 @@ def _check_api_token(auth_header):
     tokens = _load_api_tokens()
     for t in tokens:
         if t.get('token_hash') == token_hash:
-            # Update last_used
             t['last_used'] = time.strftime('%Y-%m-%dT%H:%M:%SZ')
             try:
                 with open(_TOKENS_PATH, 'w') as f:
@@ -3280,7 +3397,6 @@ def _check_api_token(auth_header):
     return None
 
 def _has_permission(token_entry, perm):
-    """Check if token has permission (read/write/delete)."""
     return perm in token_entry.get('permissions', [])
 
 
@@ -3401,12 +3517,11 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         self.wfile.write(pin_html.encode())
 
     def _check_setup(self):
-        """If setup is needed, redirect to /_setup. Returns True if setup page was served."""
         if not _setup.needs_setup(_EDITOR_DIR):
             return False
         path = self.path.split('?')[0].rstrip('/')
         if path == '/_setup':
-            return False  # Let the setup route handle it
+            return False
         self.send_response(302)
         self.send_header('Location', '/_setup')
         self.end_headers()
@@ -3472,102 +3587,6 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         self.wfile.write(html.encode())
 
     def do_GET(self):
-        # Setup wizard intercept
-        if self._check_setup():
-            return
-        path_check = self.path.split('?')[0].rstrip('/')
-
-        # ==================== API v1 (Token Auth) ====================
-        if path_check.startswith('/api/v1/'):
-            auth = self.headers.get('Authorization', '')
-            token_entry = _check_api_token(auth)
-            if not token_entry:
-                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'})
-                return
-
-            api_path = path_check[8:]  # strip /api/v1/
-
-            if api_path == 'status':
-                self._json_resp(200, {'ok': True, 'version': __version__, 'name': _cfg.get('site.name')})
-                return
-
-            if api_path == 'files' or api_path == 'files/':
-                if not _has_permission(token_entry, 'read'):
-                    self._json_resp(403, {'ok': False, 'error': 'No read permission'}); return
-                qs = parse_qs(urlparse(self.path).query)
-                dir_filter = qs.get('dir', [''])[0]
-                skip = {'.git','node_modules','__pycache__','.cache','.trash','.venv'}
-                result = []
-                base = os.path.join(WORKSPACE, dir_filter) if dir_filter else WORKSPACE
-                if not os.path.normpath(base).startswith(WORKSPACE):
-                    self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
-                for root, dirs, fnames in os.walk(base):
-                    dirs[:] = sorted([d for d in dirs if d not in skip])
-                    for fn in sorted(fnames):
-                        full = os.path.join(root, fn)
-                        rel = os.path.relpath(full, WORKSPACE)
-                        result.append({'path': rel, 'size': os.path.getsize(full), 'modified': int(os.path.getmtime(full))})
-                self._json_resp(200, {'ok': True, 'files': result, 'count': len(result)})
-                return
-
-            if api_path.startswith('files/'):
-                file_rel = url_unquote(api_path[6:])
-                if not _has_permission(token_entry, 'read'):
-                    self._json_resp(403, {'ok': False, 'error': 'No read permission'}); return
-                full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
-                if not full.startswith(WORKSPACE) or not os.path.isfile(full):
-                    self._json_resp(404, {'ok': False, 'error': 'File not found'}); return
-                try:
-                    with open(full, 'r', errors='replace') as f:
-                        content = f.read()
-                    self._json_resp(200, {'ok': True, 'path': file_rel, 'content': content, 'size': len(content)})
-                except Exception as e:
-                    self._json_resp(500, {'ok': False, 'error': str(e)})
-                return
-
-            if api_path.startswith('search'):
-                if not _has_permission(token_entry, 'read'):
-                    self._json_resp(403, {'ok': False, 'error': 'No read permission'}); return
-                qs = parse_qs(urlparse(self.path).query)
-                query = qs.get('q', [''])[0].lower()
-                if not query or len(query) < 2:
-                    self._json_resp(400, {'ok': False, 'error': 'Query too short (min 2 chars)'}); return
-                skip = {'.git','node_modules','__pycache__','.cache','.trash','.venv'}
-                results = []
-                for root, dirs, fnames in os.walk(WORKSPACE):
-                    dirs[:] = [d for d in dirs if d not in skip]
-                    for fn in fnames:
-                        if not fn.endswith(('.md','.txt','.json','.html','.csv','.yaml','.yml','.py','.js','.ts')):
-                            continue
-                        full = os.path.join(root, fn)
-                        rel = os.path.relpath(full, WORKSPACE)
-                        # Search filename
-                        if query in fn.lower():
-                            results.append({'path': rel, 'match': 'filename'})
-                            continue
-                        # Search content
-                        try:
-                            with open(full, 'r', errors='ignore') as f:
-                                content = f.read(50000)
-                            if query in content.lower():
-                                idx = content.lower().index(query)
-                                snippet = content[max(0,idx-40):idx+len(query)+40]
-                                results.append({'path': rel, 'match': 'content', 'snippet': snippet})
-                        except:
-                            pass
-                        if len(results) >= 50:
-                            break
-                self._json_resp(200, {'ok': True, 'results': results, 'count': len(results)})
-                return
-
-            self._json_resp(404, {'ok': False, 'error': 'Unknown API endpoint'})
-            return
-        if path_check == '/_setup' and _setup.needs_setup(_EDITOR_DIR):
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(_setup.SETUP_HTML.encode())
-            return
         path = self.path.split('?')[0].rstrip('/')
 
         # ==================== AUTH MIDDLEWARE ====================
@@ -4080,11 +4099,13 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
                         sheets_html.append(tbl)
                     wb.close()
                     html = '\n'.join(sheets_html)
-                elif ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
-                    mime = mimetypes.guess_type(full)[0] or 'image/png'
-                    with open(full, 'rb') as f:
-                        b64 = base64.b64encode(f.read()).decode()
-                    html = f'<div style="text-align:center;padding:20px"><img src="data:{mime};base64,{b64}" style="max-width:100%;border-radius:6px;border:1px solid #30363d" alt="{os.path.basename(full)}"></div>'
+                elif ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'):
+                    # Use direct URL instead of base64 for fast loading
+                    from urllib.parse import quote as _q
+                    img_url = 'api/raw?path=' + _q(rel, safe='')
+                    size = os.path.getsize(full)
+                    size_str = f'{size/1024:.0f} KB' if size < 1048576 else f'{size/1048576:.1f} MB'
+                    html = f'<div style="text-align:center;padding:20px"><img src="__IMG_URL__" style="max-width:100%;border-radius:6px;border:1px solid #30363d" alt="{os.path.basename(full)}"><div style="color:#7d8590;font-size:12px;margin-top:8px">{os.path.basename(full)} ({size_str})</div></div>'.replace('__IMG_URL__', img_url)
                 elif ext in ('.html', '.htm'):
                     # For HTML files, use an iframe — api() in JS adds correct prefix
                     from urllib.parse import quote
@@ -4100,17 +4121,24 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
                 html = f'<div style="color:#f85149;padding:20px">预览失败: {str(e)}</div>'
             self._json_resp(200, {'html': html, 'filename': os.path.basename(full)})
         elif path == '/api/raw':
-            # Serve raw HTML files for iframe embedding
+            # Serve raw files (images, HTML, downloads)
             qs = parse_qs(urlparse(self.path).query)
             rel = qs.get('path', [''])[0]
             full = os.path.normpath(os.path.join(WORKSPACE, rel))
             if not full.startswith(WORKSPACE) or not os.path.isfile(full):
                 self.send_error(404); return
-            ext = os.path.splitext(full)[1].lower()
-            if ext not in ('.html', '.htm'):
+            if session and not check_path_access(session['paths'], rel):
                 self.send_error(403); return
+            mime = mimetypes.guess_type(full)[0] or 'application/octet-stream'
             self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Type', mime)
+            # Download mode
+            if 'dl' in qs:
+                fname = os.path.basename(full)
+                self.send_header('Content-Disposition', 'attachment; filename="' + fname + '"')
+            size = os.path.getsize(full)
+            self.send_header('Content-Length', str(size))
+            self.send_header('Cache-Control', 'max-age=3600')
             self.end_headers()
             with open(full, 'rb') as f:
                 self.wfile.write(f.read())
@@ -4236,42 +4264,7 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
 
     def do_DELETE(self):
         path = self.path.split('?')[0].rstrip('/')
-        length = int(self.headers.get('Content-Length', 0))
-        raw_body = self.rfile.read(length) if length else b''
-
-        # ==================== API v1 WRITE ====================
-        if path == '/api/v1/files' or path.startswith('/api/v1/files/'):
-            auth = self.headers.get('Authorization', '')
-            token_entry = _check_api_token(auth)
-            if not token_entry:
-                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'}); return
-            file_rel = url_unquote(path[14:]) if len(path) > 14 else ''
-            if not file_rel:
-                self._json_resp(400, {'ok': False, 'error': 'File path required'}); return
-            full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
-            if not full.startswith(WORKSPACE):
-                self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
-
-            if False:  # PUT handled above
-                if not _has_permission(token_entry, 'write'):
-                    self._json_resp(403, {'ok': False, 'error': 'No write permission'}); return
-                body = json.loads(raw_body) if raw_body else {}
-                content = body.get('content', '')
-                os.makedirs(os.path.dirname(full), exist_ok=True)
-                with open(full, 'w') as f:
-                    f.write(content)
-                log_activity('api:' + token_entry.get('name', '?'), 'save', file_rel)
-                self._json_resp(200, {'ok': True, 'path': file_rel})
-            if self.command == 'DELETE':
-                if not _has_permission(token_entry, 'delete'):
-                    self._json_resp(403, {'ok': False, 'error': 'No delete permission'}); return
-                if not os.path.exists(full):
-                    self._json_resp(404, {'ok': False, 'error': 'Not found'}); return
-                entry = trash_item(file_rel)
-                log_activity('api:' + token_entry.get('name', '?'), 'delete', file_rel)
-                self._json_resp(200, {'ok': True, 'trashed': file_rel})
-            return
-
+        
         # Auth check
         if not path.startswith('/s/'):
             session = self._check_auth()
@@ -4298,6 +4291,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             self._json_resp(200, {'ok': True})
             return
         elif path == '/api/share':
+            if session and session['role'] == 'viewer':
+                self._json_resp(403, {'ok': False, 'error': 'No permission'}); return
             token = body.get('token', '')
             if delete_share(token):
                 self._json_resp(200, {'ok': True})
@@ -4309,41 +4304,7 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
     def do_PUT(self):
         path = self.path.split('?')[0].rstrip('/')
         length = int(self.headers.get('Content-Length', 0))
-        raw_body = self.rfile.read(length) if length else b''
-        body = json.loads(raw_body) if raw_body else {}
-
-        # ==================== API v1 WRITE ====================
-        if path == '/api/v1/files' or path.startswith('/api/v1/files/'):
-            auth = self.headers.get('Authorization', '')
-            token_entry = _check_api_token(auth)
-            if not token_entry:
-                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'}); return
-            file_rel = url_unquote(path[14:]) if len(path) > 14 else ''
-            if not file_rel:
-                self._json_resp(400, {'ok': False, 'error': 'File path required'}); return
-            full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
-            if not full.startswith(WORKSPACE):
-                self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
-
-            if self.command == 'PUT':
-                if not _has_permission(token_entry, 'write'):
-                    self._json_resp(403, {'ok': False, 'error': 'No write permission'}); return
-                body = json.loads(raw_body) if raw_body else {}
-                content = body.get('content', '')
-                os.makedirs(os.path.dirname(full), exist_ok=True)
-                with open(full, 'w') as f:
-                    f.write(content)
-                log_activity('api:' + token_entry.get('name', '?'), 'save', file_rel)
-                self._json_resp(200, {'ok': True, 'path': file_rel})
-            elif self.command == 'DELETE':
-                if not _has_permission(token_entry, 'delete'):
-                    self._json_resp(403, {'ok': False, 'error': 'No delete permission'}); return
-                if not os.path.exists(full):
-                    self._json_resp(404, {'ok': False, 'error': 'Not found'}); return
-                entry = trash_item(file_rel)
-                log_activity('api:' + token_entry.get('name', '?'), 'delete', file_rel)
-                self._json_resp(200, {'ok': True, 'trashed': file_rel})
-            return
+        body = json.loads(self.rfile.read(length)) if length else {}
 
         # PUT /api/users/{username} — update user (admin only)
         if path.startswith('/api/users/'):
@@ -4376,36 +4337,10 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length)
 
-
-        # API v1: move/rename
-        if path.startswith('/api/v1/files/') and path.endswith('/move'):
-            auth = self.headers.get('Authorization', '')
-            token_entry = _check_api_token(auth)
-            if not token_entry:
-                self._json_resp(401, {'ok': False, 'error': 'Invalid or missing API token'}); return
-            if not _has_permission(token_entry, 'write'):
-                self._json_resp(403, {'ok': False, 'error': 'No write permission'}); return
-            file_rel = url_unquote(path[14:-5])  # strip /api/v1/files/ and /move
-            body = json.loads(raw_body) if raw_body else {}
-            new_path = body.get('to', '').strip()
-            if not file_rel or not new_path:
-                self._json_resp(400, {'ok': False, 'error': 'Missing file path or destination'}); return
-            old_full = os.path.normpath(os.path.join(WORKSPACE, file_rel))
-            new_full = os.path.normpath(os.path.join(WORKSPACE, new_path))
-            if not old_full.startswith(WORKSPACE) or not new_full.startswith(WORKSPACE):
-                self._json_resp(403, {'ok': False, 'error': 'Path outside workspace'}); return
-            if not os.path.exists(old_full):
-                self._json_resp(404, {'ok': False, 'error': 'Source not found'}); return
-            os.makedirs(os.path.dirname(new_full), exist_ok=True)
-            os.rename(old_full, new_full)
-            log_activity('api:' + token_entry.get('name', '?'), 'move', file_rel, new_path)
-            self._json_resp(200, {'ok': True, 'from': file_rel, 'to': new_path})
-            return
-
         # ==================== SETUP ====================
         if path == '/_setup' and _setup.needs_setup(_EDITOR_DIR):
-            body = json.loads(raw_body) if raw_body else {}
-            result = _setup.handle_setup_post(body, _EDITOR_DIR)
+            body_data = json.loads(raw_body) if raw_body else {}
+            result = _setup.handle_setup_post(body_data, _EDITOR_DIR)
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
@@ -4495,7 +4430,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         else:
             session = None
 
-        body = json.loads(raw_body) if raw_body else {}
+        _ct = self.headers.get('Content-Type', '')
+        body = json.loads(raw_body) if raw_body and 'multipart' not in _ct and 'x-www-form-urlencoded' not in _ct else {}
 
         # ==================== SET OWN PIN ====================
         if path == '/api/pin':
@@ -4603,17 +4539,23 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             # Create a share link (file or folder)
             if not FULL_MODE:
                 self.send_error(403); return
+            if session and session['role'] == 'viewer':
+                self._json_resp(403, {'ok': False, 'error': 'No permission'}); return
             file_path = body.get('file', '')
             mode = body.get('mode', 'readonly')
             share_type = body.get('type', 'file')
             if mode not in ('readonly', 'editable'):
                 self._json_resp(400, {'ok': False, 'error': 'Invalid mode'}); return
+            if session and not check_path_access(session['paths'], file_path):
+                self._json_resp(403, {'ok': False, 'error': 'No access'}); return
             if share_type == 'folder':
                 folder_files = body.get('files', [])
                 full = os.path.normpath(os.path.join(WORKSPACE, file_path))
                 if not full.startswith(WORKSPACE) or not os.path.isdir(full):
                     self._json_resp(404, {'ok': False, 'error': 'Folder not found'}); return
                 token = create_share(file_path, mode, share_type='folder', files=folder_files)
+                if session:
+                    log_activity(session['user'], 'share', file_path, mode + ' (folder)')
                 self._json_resp(200, {'ok': True, 'token': token, 'mode': mode, 'type': 'folder', 'fileCount': len(folder_files)})
             else:
                 full = os.path.normpath(os.path.join(WORKSPACE, file_path))
@@ -4633,21 +4575,52 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             content_type = self.headers.get('Content-Type', '')
             if 'multipart/form-data' not in content_type:
                 self._json_resp(400, {'ok': False, 'error': 'Multipart required'}); return
-            import cgi, io
-            environ = {'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': content_type, 'CONTENT_LENGTH': str(length)}
-            fs = cgi.FieldStorage(fp=io.BytesIO(raw_body), environ=environ, keep_blank_values=True)
-            dest_dir = fs.getfirst('dir', '').strip()
+            # Parse boundary
+            boundary = None
+            for part in content_type.split(';'):
+                part = part.strip()
+                if part.startswith('boundary='):
+                    boundary = part[9:].strip('"')
+            if not boundary:
+                self._json_resp(400, {'ok': False, 'error': 'No boundary'}); return
+            # Parse multipart manually
+            sep = ('--' + boundary).encode()
+            parts = raw_body.split(sep)
+            dest_dir = ''
+            file_parts = []
+            for p in parts:
+                p = p.strip()
+                if not p or p == b'--':
+                    continue
+                # Split headers from body
+                hdr_end = p.find(b'\r\n\r\n')
+                if hdr_end < 0:
+                    continue
+                headers_raw = p[:hdr_end].decode('utf-8', errors='replace')
+                body_data = p[hdr_end+4:]
+                if body_data.endswith(b'\r\n'):
+                    body_data = body_data[:-2]
+                # Parse Content-Disposition
+                fname = None
+                field_name = None
+                for line in headers_raw.split('\r\n'):
+                    if 'Content-Disposition' in line:
+                        for kv in line.split(';'):
+                            kv = kv.strip()
+                            if kv.startswith('name='):
+                                field_name = kv[5:].strip('"')
+                            elif kv.startswith('filename='):
+                                fname = kv[9:].strip('"')
+                if field_name == 'dir' and not fname:
+                    dest_dir = body_data.decode('utf-8', errors='replace').strip()
+                elif fname:
+                    file_parts.append((fname, body_data))
             uploaded = []
             failed = []
-            items = fs['file'] if isinstance(fs['file'], list) else [fs['file']]
-            for item in items:
-                if not item.filename:
-                    continue
-                fname = os.path.basename(item.filename)
+            for fname, data in file_parts:
+                fname = os.path.basename(fname)
                 if not fname:
                     continue
-                # Sanitize
-                fname = fname.replace('\\', '/').split('/')[-1]
                 rel = os.path.join(dest_dir, fname) if dest_dir else fname
                 full = os.path.normpath(os.path.join(WORKSPACE, rel))
                 if not full.startswith(WORKSPACE):
@@ -4655,7 +4628,6 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
                 if session and not check_path_access(session['paths'], rel):
                     failed.append(fname); continue
                 os.makedirs(os.path.dirname(full), exist_ok=True)
-                data = item.file.read()
                 with open(full, 'wb') as f:
                     f.write(data)
                 uploaded.append(rel)
@@ -4714,6 +4686,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         elif path == '/api/move':
             if not FULL_MODE:
                 self.send_error(403); return
+            if session and session['role'] == 'viewer':
+                self._json_resp(403, {'ok': False, 'error': 'No permission'}); return
             src = body.get('from', '').strip()
             dest_dir = body.get('toDir', '').strip()
             if not src:
@@ -4721,6 +4695,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             src_full = os.path.normpath(os.path.join(WORKSPACE, src))
             if not src_full.startswith(WORKSPACE) or not os.path.isfile(src_full):
                 self._json_resp(404, {'ok': False, 'error': '源文件不存在'}); return
+            if session and not check_path_access(session['paths'], src):
+                self._json_resp(403, {'ok': False, 'error': 'No access to this file'}); return
             # Destination
             fname = os.path.basename(src)
             if dest_dir:
@@ -4741,10 +4717,16 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         elif path == '/api/delete':
             if not FULL_MODE:
                 self.send_error(403); return
+            if session and session['role'] == 'viewer':
+                self._json_resp(403, {'ok': False, 'error': 'No permission'}); return
             rel = body.get('path', '').strip()
             if not rel:
                 self._json_resp(400, {'ok': False, 'error': '缺少路径'}); return
+            if session and not check_path_access(session['paths'], rel):
+                self._json_resp(403, {'ok': False, 'error': 'No access to this file'}); return
             entry = trash_item(rel)
+            if session and entry:
+                log_activity(session['user'], 'delete', rel)
             if entry:
                 self._json_resp(200, {'ok': True, 'entry': entry})
             else:
@@ -4753,11 +4735,15 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         elif path == '/api/restore':
             if not FULL_MODE:
                 self.send_error(403); return
+            if session and session['role'] == 'viewer':
+                self._json_resp(403, {'ok': False, 'error': 'No permission'}); return
             trash_id = body.get('id', '').strip()
             if not trash_id:
                 self._json_resp(400, {'ok': False, 'error': '缺少 id'}); return
             entry, err = restore_item(trash_id)
             if entry:
+                if session:
+                    log_activity(session['user'], 'restore', entry['original'])
                 self._json_resp(200, {'ok': True, 'restored': entry['original']})
             else:
                 self._json_resp(400, {'ok': False, 'error': err})
@@ -4765,6 +4751,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         elif path == '/api/trash-empty':
             if not FULL_MODE:
                 self.send_error(403); return
+            if not session or session['role'] != 'admin':
+                self._json_resp(403, {'ok': False, 'error': 'Admin only'}); return
             empty_trash()
             if session:
                 log_activity(session['user'], 'empty_trash', '')
@@ -4774,7 +4762,7 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             if not FULL_MODE:
                 self.send_error(403); return
             if session and session['role'] == 'viewer':
-                self._json_resp(403, {'ok': False, 'error': '查看者无法创建文件'}); return
+                self._json_resp(403, {'ok': False, 'error': 'No permission'}); return
             rel = body.get('path', '').strip()
             if not rel or '..' in rel:
                 self.send_response(400)
@@ -4784,6 +4772,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
                 return
             if not rel.endswith('.md'):
                 rel += '.md'
+            if session and not check_path_access(session['paths'], rel):
+                self._json_resp(403, {'ok': False, 'error': 'No access to this path'}); return
             full = os.path.normpath(os.path.join(WORKSPACE, rel))
             if not full.startswith(WORKSPACE):
                 self.send_response(403)
@@ -4800,6 +4790,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             os.makedirs(os.path.dirname(full), exist_ok=True)
             with open(full, 'w') as f:
                 f.write(f'# {os.path.splitext(os.path.basename(rel))[0]}\n\n')
+            if session:
+                log_activity(session['user'], 'create', rel)
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
@@ -4981,5 +4973,5 @@ if __name__ == '__main__':
     _load_sessions_from_file()
     start_cleanup_thread()
     mode = 'SHARE: ' + SHARE_FILE if SHARE_FILE else 'FULL (all files)'
-    print(f'Editor v7 [{mode}] → http://0.0.0.0:{PORT}')
+    print(f'Asyre File v{__version__} [{mode}] → http://{_cfg.get("server.host")}:{PORT}')
     HTTPServer((_cfg.get('server.host'), PORT), Handler).serve_forever()
