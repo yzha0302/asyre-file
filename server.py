@@ -1,33 +1,17 @@
 #!/usr/bin/env python3
-"""Asyre File - self-hosted markdown workspace for humans and AI agents.
-Originally: Markdown editor v8 — v7 + drag-drop move + reference detection + smart new file.
+"""Markdown editor v8 — v7 + drag-drop move + reference detection + smart new file.
 Usage:
   python3 server.py [port]              # Full mode (Asher, all files)
   python3 server.py [port] --file PATH  # Share mode (single file only)
   python3 server.py [port] --dir PATH   # Scoped mode (only show files under PATH)
 """
-__version__ = "1.0.0"
-
 import json, os, re, sys, time, secrets, threading, mimetypes, base64, hashlib
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse, quote as url_quote, unquote as url_unquote
 from http.cookies import SimpleCookie
 
-# Configuration
-import config as _cfg
-# Setup wizard
-import setup_wizard as _setup
-
-# Export module (optional)
-try:
-    from export import export_pdf, export_word, start_cleanup_thread, get_config
-    _HAS_EXPORT = True
-except ImportError:
-    _HAS_EXPORT = False
-    def export_pdf(*a, **kw): raise RuntimeError("Export not available. pip install weasyprint python-docx")
-    def export_word(*a, **kw): raise RuntimeError("Export not available. pip install weasyprint python-docx")
-    def start_cleanup_thread(): pass
-    def get_config(): return {}
+# Export module
+from export import export_pdf, export_word, start_cleanup_thread, get_config
 
 # Track pending downloads: {downloadId: {path, filename, created}}
 _downloads = {}
@@ -244,12 +228,12 @@ def _get_auth_cookie(handler):
     morsel = cookies.get('auth_token')
     return morsel.value if morsel else None
 
-WORKSPACE = _cfg.get('workspace.path')
+WORKSPACE = os.path.expanduser('~/xiu-he')
 ANN_DIR = os.path.join(WORKSPACE, 'annotations')
 TRASH_DIR = os.path.join(WORKSPACE, '.trash')
 os.makedirs(ANN_DIR, exist_ok=True)
 os.makedirs(TRASH_DIR, exist_ok=True)
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else _cfg.get('server.port')
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8899
 
 # ==================== SHARE SYSTEM ====================
 SHARES_FILE = os.path.join(WORKSPACE, 'shares.json')
@@ -1091,7 +1075,7 @@ __SIDEBAR_HTML__
 <div class="ann-header">
 <span class="ann-badge" id="annTotal">0</span>
 <span class="ann-hint">选中文字后添加标注</span>
-<button class="ann-copy-btn" onclick="submitAnnotations()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> 复制全部</button>
+<button class="ann-copy-btn" onclick="saveAnnotationsToServer()" style="background:var(--border);color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> Save</button><button class="ann-copy-btn" onclick="submitAnnotations()" style="background:var(--green)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy</button>
 </div>
 <div id="annListItems"></div>
 </div>
@@ -1460,6 +1444,44 @@ window.deleteAnnotation=function(id){
 };
 
 // Submit annotations to server
+
+
+async function saveAnnotationsToServer(){
+  if(!annotations.length){showToast('No annotations','var(--accent)');return;}
+  const data={
+    file:currentFile,
+    timestamp:new Date().toISOString(),
+    user:AUTH_USER?AUTH_USER.name:'anonymous',
+    annotations:annotations.map(a=>({
+      startLine:a.startLine+1,endLine:a.endLine+1,comment:a.comment,
+      text:(() => {let lines=[];for(let l=a.startLine;l<=a.endLine&&l<a.startLine+10;l++)lines.push(cm.getLine(l)||'');return lines.join('\n');})()
+    }))
+  };
+  try{
+    const r=await fetch(api('api/annotations'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const d=await r.json();
+    if(d.ok)showToast('Annotations saved');
+    else showToast(d.error||'Save failed','var(--red)');
+  }catch(e){showToast('Save failed','var(--red)');}
+}
+function sendAnnotationsToAI(){
+  if(!annotations.length){showToast('No annotations yet','var(--accent)');return;}
+  // Build annotation summary
+  let summary='Please apply these review annotations to the document:\n\n';
+  annotations.forEach((ann,i)=>{
+    let lines=[];
+    for(let l=ann.startLine;l<=ann.endLine;l++)lines.push(cm.getLine(l)||'');
+    const selectedText=lines.slice(0,5).join('\n');
+    summary+='['+(i+1)+'] Lines '+(ann.startLine+1)+'-'+(ann.endLine+1)+':\n';
+    summary+='> '+selectedText+'\n';
+    summary+='Feedback: '+ann.comment+'\n\n';
+  });
+  // Open AI panel and send
+  const p=document.getElementById('aiPanel');
+  if(p&&!p.classList.contains('open'))p.classList.add('open');
+  document.getElementById('aiInput').value=summary;
+  sendAI();
+}
 function submitAnnotations(){
   if(!annotations.length){showToast('⚠️ 还没有标注','var(--accent)');return;}
   
@@ -3000,6 +3022,7 @@ async function sendAI(){
     const sel=cm.getSelection();
     const body={instruction:msg,content:content};
     if(sel)body.selection=sel;
+    if(annotations.length)body.annotations=annotations.map(a=>({startLine:a.startLine+1,endLine:a.endLine+1,comment:a.comment}));
     if(currentFile)body.path=currentFile;
 
     const res=await fetch(api('api/ai-edit'),{
@@ -3365,41 +3388,6 @@ def get_activity(limit=100, offset=0):
     return result, total
 
 
-# ==================== API TOKEN AUTH ====================
-_TOKENS_PATH = os.path.join(_EDITOR_DIR, 'api_tokens.json')
-
-def _load_api_tokens():
-    if not os.path.exists(_TOKENS_PATH):
-        return []
-    try:
-        with open(_TOKENS_PATH) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return []
-
-def _check_api_token(auth_header):
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return None
-    token = auth_header[7:].strip()
-    if not token.startswith('asf_'):
-        return None
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-    tokens = _load_api_tokens()
-    for t in tokens:
-        if t.get('token_hash') == token_hash:
-            t['last_used'] = time.strftime('%Y-%m-%dT%H:%M:%SZ')
-            try:
-                with open(_TOKENS_PATH, 'w') as f:
-                    json.dump(tokens, f, indent=2)
-            except:
-                pass
-            return t
-    return None
-
-def _has_permission(token_entry, perm):
-    return perm in token_entry.get('permissions', [])
-
-
 class Handler(SimpleHTTPRequestHandler):
     def _json_resp(self, code, data):
         self.send_response(code)
@@ -3515,17 +3503,6 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         self.send_header('Cache-Control', 'no-store')
         self.end_headers()
         self.wfile.write(pin_html.encode())
-
-    def _check_setup(self):
-        if not _setup.needs_setup(_EDITOR_DIR):
-            return False
-        path = self.path.split('?')[0].rstrip('/')
-        if path == '/_setup':
-            return False
-        self.send_response(302)
-        self.send_header('Location', '/_setup')
-        self.end_headers()
-        return True
 
     def _serve_login(self, error='', redirect_to=''):
         html = LOGIN_HTML
@@ -4337,16 +4314,6 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length)
 
-        # ==================== SETUP ====================
-        if path == '/_setup' and _setup.needs_setup(_EDITOR_DIR):
-            body_data = json.loads(raw_body) if raw_body else {}
-            result = _setup.handle_setup_post(body_data, _EDITOR_DIR)
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(result).encode())
-            return
-
         # ==================== LOGIN ====================
         if path == '/login' or path == '/login/':
             # Parse form data or JSON
@@ -4964,14 +4931,8 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
     def log_message(self, *args): pass
 
 if __name__ == '__main__':
-    if '--version' in sys.argv:
-        print(f'Asyre File v{__version__}')
-        sys.exit(0)
-    if '--setup' in sys.argv:
-        _setup.cli_setup(_EDITOR_DIR)
-        sys.exit(0)
     _load_sessions_from_file()
     start_cleanup_thread()
     mode = 'SHARE: ' + SHARE_FILE if SHARE_FILE else 'FULL (all files)'
-    print(f'Asyre File v{__version__} [{mode}] → http://{_cfg.get("server.host")}:{PORT}')
-    HTTPServer((_cfg.get('server.host'), PORT), Handler).serve_forever()
+    print(f'Editor v7 [{mode}] → http://0.0.0.0:{PORT}')
+    HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()

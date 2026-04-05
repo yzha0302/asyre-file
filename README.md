@@ -4,27 +4,57 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/yzha0302/asyre-file)](https://github.com/yzha0302/asyre-file/releases)
 
-**Self-hosted markdown workspace for humans and AI agents.**
+**A browser-based file workspace that bridges AI agents on your server with humans on any device.**
 
-A single-file Python web server with a full-featured editor UI — no build step, no Node.js, zero external dependencies for core functionality.
+## Why Asyre File?
 
-## Features
+You're running AI agents (Claude, GPT, custom harnesses) on a remote server. They generate reports, draft documents, write code. But how do you:
 
-- **Live Editor** — CodeMirror with syntax highlighting for 20+ languages
-- **Markdown Preview** — Real-time rendering with Mermaid diagrams, math, and code highlighting
-- **Multi-User Auth** — Admin / Editor / Viewer roles with path-based permissions
-- **File Management** — Tree view, drag-and-drop, upload, rename, search, trash & restore
-- **Share Links** — Read-only or editable, single file or folder
-- **PDF & Word Export** — With custom signatures and themes (optional deps)
-- **Annotations** — Line-range comments for review workflows
-- **AI Assistant** — Built-in AI editing with Anthropic/OpenAI support
-- **Dark & Light Themes** — Full theme support including CodeMirror and Mermaid
-- **Agent REST API** — Token-authenticated CRUD for AI agent integration
-- **First-Run Wizard** — Web UI or CLI setup, zero manual config needed
+- **See what the AI produced** without SSH-ing in?
+- **Give feedback** on a specific paragraph and have AI revise it?
+- **Share the output** with a client or teammate who has no server access?
+
+Asyre File solves this. It runs on the same server as your AI agents, exposes a browser UI, and connects both sides:
+
+```
+                    Browser (any device)
+                         |
+           +-------------+-------------+
+           |                           |
+     Human reads/edits            Human annotates
+     files in the editor          specific lines
+           |                           |
+           v                           v
+    +------+------+            +-------+-------+
+    | Asyre File  |  REST API  |  Asyre File   |
+    |  (server)   |<---------->| Annotation +  |
+    +------+------+            |  AI Pipeline  |
+           ^                   +-------+-------+
+           |                           |
+     AI agents read/write        AI receives feedback
+     files via API               and revises the doc
+           |
+    +------+------+
+    | Your AI     |
+    | Agent       |
+    | (on server) |
+    +-------------+
+```
+
+### The Workflow
+
+1. **AI agent writes a file** via REST API (`PUT /api/v1/files/report.md`)
+2. **You open the browser**, see the file in the editor with live preview
+3. **You annotate**: select lines 12-18, write "too formal, make it conversational"
+4. **Copy annotations** to clipboard -- paste into your AI (Claude, GPT, or any harness)
+5. **AI revises**, you paste the result back or the agent writes via API
+6. **Share a link** with your client -- they see a read-only (or editable) view, no account needed
+
+Annotations are also **saved to the server**, so your AI agent can read them via `GET /api/v1/files/annotations/` and process feedback automatically.
+
+No SSH, no `scp`, no copy-paste. The browser IS the interface to your server's file system.
 
 ## Quick Start
-
-### Option 1: Git Clone (recommended)
 
 ```bash
 git clone https://github.com/yzha0302/asyre-file.git
@@ -32,114 +62,101 @@ cd asyre-file
 python3 server.py
 ```
 
-Visit `http://localhost:8765` — the setup wizard will create your admin account.
+Visit `http://localhost:8765` -- the setup wizard creates your admin account and (optionally) an API token for your agents.
 
-### Option 2: One-Line Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/yzha0302/asyre-file/main/install.sh | bash
-```
-
-### Option 3: Docker
-
+**Docker:**
 ```bash
 docker compose up -d
 ```
 
-Or without compose:
+**One-line install:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/yzha0302/asyre-file/main/install.sh | bash
+```
+
+## Core Features
+
+### For Humans (Browser)
+
+- **Live Markdown editor** with syntax highlighting for 20+ languages
+- **Real-time preview** with Mermaid diagrams, code highlighting, math
+- **Annotation system** -- select any lines, write feedback, then:
+  - **Save** annotations to the server (your AI agent can read them via API)
+  - **Copy** formatted feedback to clipboard (paste into any AI chat)
+- **File management** -- tree view, drag-and-drop, upload, rename, multi-select, right-click context menu
+- **Share links** -- read-only or editable, single file or entire folder
+- **PDF & Word export** with custom signatures and themes
+- **Dark & light themes**
+
+### For AI Agents (REST API)
+
+Your AI agents interact with the same file system via a simple REST API:
 
 ```bash
-docker build -t asyre-file .
-docker run -d -p 8765:8765 -v ~/asyre-data:/app/data asyre-file
+# List files
+curl -H "Authorization: Bearer asf_xxx" http://your-server:8765/api/v1/files
+
+# Read a file
+curl -H "Authorization: Bearer asf_xxx" http://your-server:8765/api/v1/files/report.md
+
+# Write a file
+curl -X PUT -H "Authorization: Bearer asf_xxx" \
+  -d '{"content": "# Report\n\nGenerated by AI agent."}' \
+  http://your-server:8765/api/v1/files/report.md
+
+# Search across all files
+curl -H "Authorization: Bearer asf_xxx" http://your-server:8765/api/v1/search?q=keyword
+
+# Delete (moves to trash)
+curl -X DELETE -H "Authorization: Bearer asf_xxx" \
+  http://your-server:8765/api/v1/files/old-draft.md
 ```
+
+Agents can also **read saved annotations** via `GET /api/v1/files/annotations/` to process human feedback programmatically.
+
+### For Teams (Multi-User)
+
+| Role | Can do |
+|------|--------|
+| **Admin** | Everything + user management + empty trash |
+| **Editor** | Read/write/upload/share within assigned paths |
+| **Viewer** | Read-only access to assigned paths |
+
+Each user gets scoped access -- an editor assigned to `clients/acme/` can only see and edit files in that folder.
 
 ## Configuration
 
-Copy `config.example.json` to `config.json` and edit, or use environment variables:
+Copy `config.example.json` to `config.json`, or use environment variables:
 
 ```bash
-# Environment variables (override config.json)
 ASF_SERVER_PORT=9000
 ASF_WORKSPACE_PATH=/path/to/files
 ASF_AI_ENABLED=true
 ASF_AI_APIKEY=sk-...
 ```
 
-See [config.example.json](config.example.json) for all options.
+See [docs/configuration.md](docs/configuration.md) for all options.
 
-## Agent API
+## How It Works
 
-Asyre File exposes a REST API for AI agents to read and write files programmatically.
+Asyre File is a **single Python file** (`server.py`, ~5000 lines) with all HTML, CSS, and JavaScript inline. No build step, no Node.js, no npm. The only requirement is Python 3.8+.
 
-### Generate a Token
-
-During setup, check "Generate API token for agents", or use the CLI:
-
-```bash
-python3 server.py --setup
-```
-
-### Endpoints
-
-```bash
-# Health check
-curl -H "Authorization: Bearer asf_xxx" http://localhost:8765/api/v1/status
-
-# List files
-curl -H "Authorization: Bearer asf_xxx" http://localhost:8765/api/v1/files
-
-# Read a file
-curl -H "Authorization: Bearer asf_xxx" http://localhost:8765/api/v1/files/notes/todo.md
-
-# Create/update a file
-curl -X PUT -H "Authorization: Bearer asf_xxx" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "# Hello\nCreated by agent"}' \
-  http://localhost:8765/api/v1/files/notes/new.md
-
-# Search
-curl -H "Authorization: Bearer asf_xxx" http://localhost:8765/api/v1/search?q=keyword
-
-# Delete (moves to trash)
-curl -X DELETE -H "Authorization: Bearer asf_xxx" \
-  http://localhost:8765/api/v1/files/notes/old.md
-```
-
-### Permissions
-
-Tokens support granular permissions: `read`, `write`, `delete`.
-
-## Roles & Permissions
-
-| Action | Admin | Editor | Viewer |
-|--------|-------|--------|--------|
-| View files | All | Scoped paths | Scoped paths |
-| Edit / Save | Yes | Scoped | No |
-| Create / Upload | Yes | Scoped | No |
-| Move / Rename | Yes | Scoped | No |
-| Delete (trash) | Yes | Scoped | No |
-| Empty trash | Yes | No | No |
-| Share links | Yes | Scoped | No |
-| User management | Yes | No | No |
-
-## Export (Optional)
-
-PDF and Word export requires additional dependencies:
-
-```bash
-pip install weasyprint python-docx
-```
-
-The editor works fully without these — export buttons will show an install prompt.
-
-## Tech Stack
-
-- **Backend**: Python 3 stdlib (`http.server`) — zero required dependencies
-- **Editor**: CodeMirror 5
-- **Preview**: marked.js + highlight.js + Mermaid
+- **Backend**: Python stdlib `http.server` -- zero required dependencies
+- **Editor**: CodeMirror 5 (CDN)
+- **Preview**: marked.js + highlight.js + Mermaid (CDN)
 - **UI**: Tailwind CSS + DaisyUI (CDN) + custom components
-- **Architecture**: Single-file server with inline HTML/CSS/JS
+- **Export** (optional): `pip install weasyprint python-docx`
+
+## Documentation
+
+- [API Reference](docs/api.md) -- full REST API documentation
+- [Configuration](docs/configuration.md) -- all config options
+- [Deployment](docs/deployment.md) -- Docker, Nginx, systemd, PM2
 
 ## License
 
 [MIT](LICENSE)
+
+---
+
+Built by [Asyre](https://github.com/yzha0302) for humans who work with AI.
