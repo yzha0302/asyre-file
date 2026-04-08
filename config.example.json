@@ -1,33 +1,113 @@
 {
-  "_comment": "Asyre File configuration. Copy to config.json and edit.",
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8765,
-    "base_url": ""
+  "title": "Asyre File",
+  "brand": {
+    "watermark": "",
+    "logo": null
   },
-  "site": {
-    "name": "Asyre File",
-    "language": "en"
+  "signatures": {
+    "default": {
+      "name": "Your Name",
+      "avatar": null
+    },
+    "none": null
   },
-  "workspace": {
-    "path": "./data",
-    "max_upload_mb": 50
+  "pdfThemes": {
+    "light": {
+      "label": "☀️ Light",
+      "default": true
+    },
+    "dark": {
+      "label": "🌙 Dark"
+    },
+    "sepia": {
+      "label": "📜 Sepia"
+    }
   },
-  "auth": {
-    "session_timeout_hours": 72,
-    "allow_registration": false
+  "pdfLayouts": {
+    "a4": {
+      "label": "A4",
+      "default": true
+    },
+    "a4-compact": {
+      "label": "A4 Compact"
+    },
+    "letter": {
+      "label": "Letter"
+    },
+    "single": {
+      "label": "📜 Single Page"
+    }
+  },
+  "wordStyles": {
+    "modern": {
+      "label": "Modern",
+      "font": "Calibri",
+      "fontEast": "微软雅黑",
+      "size": 11,
+      "lineSpacing": 1.15,
+      "default": true
+    },
+    "classic": {
+      "label": "Classic",
+      "font": "Times New Roman",
+      "fontEast": "宋体",
+      "size": 12,
+      "lineSpacing": 1.5
+    },
+    "elegant": {
+      "label": "Elegant",
+      "font": "Georgia",
+      "fontEast": "楷体",
+      "size": 11.5,
+      "lineSpacing": 1.6
+    }
+  },
+  "wordMargins": {
+    "normal": {
+      "label": "Normal",
+      "top": 2.54,
+      "bottom": 2.54,
+      "left": 3.18,
+      "right": 3.18,
+      "default": true
+    },
+    "narrow": {
+      "label": "Narrow",
+      "top": 1.27,
+      "bottom": 1.27,
+      "left": 1.27,
+      "right": 1.27
+    },
+    "wide": {
+      "label": "Wide",
+      "top": 2.54,
+      "bottom": 2.54,
+      "left": 5.08,
+      "right": 5.08
+    },
+    "compact": {
+      "label": "Compact",
+      "top": 1.9,
+      "bottom": 1.9,
+      "left": 2.0,
+      "right": 2.0
+    }
+  },
+  "wordPages": {
+    "a4": {
+      "label": "A4",
+      "width": 21.0,
+      "height": 29.7,
+      "default": true
+    },
+    "letter": {
+      "label": "Letter",
+      "width": 21.59,
+      "height": 27.94
+    }
   },
   "ai": {
-    "enabled": false,
-    "provider": "anthropic",
-    "api_key": "",
-    "model": "claude-sonnet-4-5-20250514"
-  },
-  "export": {
-    "pdf_enabled": true,
-    "word_enabled": true
-  },
-  "api": {
-    "enabled": true
+    "model": "claude-sonnet-4-6",
+    "systemPrompt": "You are a Markdown document editing assistant. The user will give you a document and editing instructions.\nYour task is to modify the document content according to the instructions, returning the complete modified document.\nRules:\n1. Only return the complete modified Markdown document, no explanations or wrapping\n2. Preserve original formatting (headings, lists, bold, etc.)\n3. Only modify what the instructions ask for, keep everything else unchanged\n4. If instructions are unclear, execute the most reasonable interpretation"
   }
 }
