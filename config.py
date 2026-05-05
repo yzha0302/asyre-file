@@ -22,6 +22,9 @@ _DEFAULTS = {
         "max_upload_mb": 50,
         "trash_enabled": True,
     },
+    "data_dir": {
+        "path": "",
+    },
     "auth": {
         "session_timeout_hours": 72,
         "allow_registration": False,

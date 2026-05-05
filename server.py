@@ -94,6 +94,18 @@ def _save_users(data):
     _users_cache = data
     _users_mtime = os.path.getmtime(_USERS_PATH)
 
+def needs_setup():
+    """Setup wizard is required when no admin user exists yet."""
+    if not os.path.exists(_USERS_PATH):
+        return True
+    try:
+        users = get_users().get('users', {})
+    except Exception:
+        return True
+    if not users:
+        return True
+    return not any(u.get('role') == 'admin' for u in users.values())
+
 def hash_password(password):
     salt = secrets.token_hex(16)
     h = hashlib.sha256((salt + password).encode()).hexdigest()
@@ -228,15 +240,25 @@ def _get_auth_cookie(handler):
     morsel = cookies.get('auth_token')
     return morsel.value if morsel else None
 
-WORKSPACE = os.path.expanduser('~/xiu-he')
-ANN_DIR = os.path.join(WORKSPACE, 'annotations')
-TRASH_DIR = os.path.join(WORKSPACE, '.trash')
+import config as _asf_config
+WORKSPACE = os.path.abspath(os.path.expanduser(_asf_config.get('workspace.path')))
+
+# Asyre's own metadata lives in DATA_DIR, not WORKSPACE — keeps user's content folder clean.
+_data_dir_cfg = (_asf_config.get('data_dir.path') or '').strip()
+if _data_dir_cfg:
+    DATA_DIR = os.path.abspath(os.path.expanduser(_data_dir_cfg))
+else:
+    DATA_DIR = os.path.join(_EDITOR_DIR, '.asyre-data')
+os.makedirs(DATA_DIR, exist_ok=True)
+
+ANN_DIR = os.path.join(DATA_DIR, 'annotations')
+TRASH_DIR = os.path.join(DATA_DIR, 'trash')
 os.makedirs(ANN_DIR, exist_ok=True)
 os.makedirs(TRASH_DIR, exist_ok=True)
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8899
 
 # ==================== SHARE SYSTEM ====================
-SHARES_FILE = os.path.join(WORKSPACE, 'shares.json')
+SHARES_FILE = os.path.join(DATA_DIR, 'shares.json')
 _shares_lock = threading.Lock()
 
 def _load_shares():
@@ -444,6 +466,150 @@ body{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;min-height:100vh;
   const saved=localStorage.getItem('md-editor-theme')||'dark';
   document.documentElement.setAttribute('data-theme',saved);
 </script>
+</body>
+</html>'''
+
+SETUP_HTML = r'''<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setup — Asyre File</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<style>
+body{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:oklch(var(--b1));margin:0;padding:24px}
+.error{display:__ERROR_DISPLAY__}
+.dir-list{max-height:280px;overflow-y:auto;border:1px solid oklch(var(--b3));border-radius:8px;background:oklch(var(--b1))}
+.dir-row{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;border-bottom:1px solid oklch(var(--b3) / 0.5)}
+.dir-row:last-child{border-bottom:none}
+.dir-row:hover{background:oklch(var(--b3))}
+.dir-row.up{color:oklch(var(--p))}
+.crumbs{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:oklch(var(--b1));padding:6px 10px;border-radius:6px;border:1px solid oklch(var(--b3));word-break:break-all}
+</style>
+</head>
+<body>
+<div class="card bg-base-200 shadow-2xl w-[560px] max-w-[95vw]">
+<div class="card-body gap-5">
+
+<div class="text-center">
+  <svg class="mx-auto mb-3 opacity-60" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/></svg>
+  <h2 class="text-2xl font-bold text-primary">Asyre File · 初次配置</h2>
+  <p class="text-sm text-base-content/60 mt-1">选择工作目录并创建管理员账号</p>
+</div>
+
+<div class="error"><div class="alert alert-error text-sm">__ERROR_MSG__</div></div>
+
+<form method="POST" action="setup" id="setupForm">
+
+  <fieldset class="fieldset gap-3">
+    <legend class="fieldset-legend text-sm font-semibold">1. 工作目录</legend>
+    <p class="text-xs text-base-content/60 -mt-1">这是你要让 AI 与浏览器共享的文件夹。Asyre 自身的元数据（trash / annotations / shares）不会写入此目录。</p>
+    <div class="crumbs" id="currentPath">~</div>
+    <div class="dir-list" id="dirList"></div>
+    <input type="hidden" name="workspace_path" id="workspacePath" value="" />
+    <div class="text-xs text-base-content/50 mt-1">点击文件夹进入，点 <span class="font-semibold text-primary">使用此目录</span> 选定。</div>
+    <button type="button" class="btn btn-sm btn-outline w-full" id="useThisBtn">使用此目录作为工作目录</button>
+    <div class="text-xs text-base-content/60 mt-1">已选: <span id="chosenPath" class="font-mono text-primary">（未选）</span></div>
+  </fieldset>
+
+  <fieldset class="fieldset gap-3 mt-4">
+    <legend class="fieldset-legend text-sm font-semibold">2. 管理员账号</legend>
+    <label class="fieldset-label text-xs font-semibold text-base-content/60">用户名</label>
+    <input type="text" name="username" class="input input-bordered w-full" autocomplete="username" required minlength="2" maxlength="32" pattern="[A-Za-z0-9_-]+" title="字母/数字/下划线/连字符" value="admin" />
+
+    <label class="fieldset-label text-xs font-semibold text-base-content/60">显示名（可选）</label>
+    <input type="text" name="display_name" class="input input-bordered w-full" maxlength="64" />
+
+    <label class="fieldset-label text-xs font-semibold text-base-content/60">密码</label>
+    <input type="password" name="password" class="input input-bordered w-full" autocomplete="new-password" required minlength="6" />
+
+    <label class="fieldset-label text-xs font-semibold text-base-content/60">确认密码</label>
+    <input type="password" name="password2" class="input input-bordered w-full" autocomplete="new-password" required minlength="6" />
+  </fieldset>
+
+  <button type="submit" class="btn btn-primary w-full mt-5" id="submitBtn" disabled>保存配置</button>
+</form>
+
+</div>
+</div>
+
+<script>
+  const saved=localStorage.getItem('md-editor-theme')||'dark';
+  document.documentElement.setAttribute('data-theme',saved);
+
+  let currentDir = '__START_DIR__';
+  const pathEl = document.getElementById('currentPath');
+  const listEl = document.getElementById('dirList');
+  const wsInput = document.getElementById('workspacePath');
+  const chosenEl = document.getElementById('chosenPath');
+  const submitBtn = document.getElementById('submitBtn');
+  const useBtn = document.getElementById('useThisBtn');
+
+  async function loadDir(dir){
+    try{
+      const r = await fetch('api/host-list?dir=' + encodeURIComponent(dir));
+      if(!r.ok){
+        listEl.innerHTML = '<div class="dir-row" style="color:oklch(var(--er))">无法读取此目录（权限不足？）</div>';
+        return;
+      }
+      const data = await r.json();
+      currentDir = data.path;
+      pathEl.textContent = data.path;
+      let html = '';
+      if(data.parent){
+        html += '<div class="dir-row up" data-dir="'+escapeAttr(data.parent)+'">⤴ 返回上一级</div>';
+      }
+      if(!data.entries.length){
+        html += '<div class="dir-row" style="color:oklch(var(--bc) / 0.5)">（无子目录）</div>';
+      }
+      data.entries.forEach(e => {
+        html += '<div class="dir-row" data-dir="'+escapeAttr(e.path)+'">📁 '+escapeHtml(e.name)+'</div>';
+      });
+      listEl.innerHTML = html;
+      listEl.querySelectorAll('.dir-row[data-dir]').forEach(el => {
+        el.addEventListener('click', () => loadDir(el.getAttribute('data-dir')));
+      });
+    } catch(e) {
+      listEl.innerHTML = '<div class="dir-row" style="color:oklch(var(--er))">'+escapeHtml(String(e))+'</div>';
+    }
+  }
+  function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function escapeAttr(s){ return escapeHtml(s); }
+  useBtn.addEventListener('click', () => {
+    wsInput.value = currentDir;
+    chosenEl.textContent = currentDir;
+    submitBtn.disabled = false;
+  });
+  document.getElementById('setupForm').addEventListener('submit', e => {
+    if(!wsInput.value){ e.preventDefault(); alert('请先选择工作目录'); return; }
+    const p = e.target.elements['password'].value;
+    const p2 = e.target.elements['password2'].value;
+    if(p !== p2){ e.preventDefault(); alert('两次密码不一致'); }
+  });
+  loadDir(currentDir);
+</script>
+</body>
+</html>'''
+
+SETUP_DONE_HTML = r'''<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>Setup Complete — Asyre File</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<style>body{font-family:-apple-system,system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:oklch(var(--b1));margin:0;padding:24px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:oklch(var(--b1));padding:8px 12px;border-radius:6px;border:1px solid oklch(var(--b3));word-break:break-all}</style>
+</head>
+<body>
+<div class="card bg-base-200 shadow-2xl w-[520px] max-w-[95vw]">
+<div class="card-body gap-4 text-center">
+<svg class="mx-auto" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="oklch(var(--su))" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+<h2 class="text-xl font-bold">配置已保存</h2>
+<div class="text-sm text-base-content/70">工作目录：<div class="mono mt-1">__WORKSPACE__</div></div>
+__RESTART_BLOCK__
+</div></div>
+<script>const saved=localStorage.getItem('md-editor-theme')||'dark';document.documentElement.setAttribute('data-theme',saved);</script>
 </body>
 </html>'''
 
@@ -1046,6 +1212,7 @@ __READONLY_BANNER__
 <span class="sep" __SHARE_BTN_DISPLAY__></span>
 <button onclick="showShareDialog()" id="shareBtn" __SHARE_BTN_DISPLAY__ title="分享"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
 <button onclick="showExportDialog()" id="exportBtn" title="导出"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+<button onclick="openInNewTab()" id="openTabBtn" style="display:none" title="在新标签页打开"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
 <span class="sep"></span>
 <button class="ann-btn" onclick="toggleAnnotationMode()" id="annBtn" __ANN_BTN_DISPLAY__ title="标注"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg></button>
 <span class="badge" id="annCount" style="display:none">0</span>
@@ -1944,6 +2111,7 @@ function openFile(path){
     document.getElementById('saveBtn').style.display='none';
     dirty=false;
     revealFileInTree(path);addRecent(path);
+    updateOpenTabBtnVisibility();
     const previewBtn=document.querySelector('.tabs button:last-child');
     if(previewBtn)setView('preview-only',previewBtn);
     const imgUrl=api('api/raw')+'?path='+encodeURIComponent(path);
@@ -1952,22 +2120,6 @@ function openFile(path){
   }
   const nonMdTypes=['pdf','docx','xlsx','xls'];
   if(nonMdTypes.includes(ext)){
-    if(ext==='html'||ext==='htm'){
-      _previewLocked=true;
-      currentFile=path;
-      cm.setValue('');cm.clearHistory();
-      document.getElementById('fname').textContent=path;
-      document.getElementById('saveBtn').style.display='none';
-      // preview mode - no status text needed
-      document.getElementById('status').style.color='var(--blue)';
-      dirty=false;
-      revealFileInTree(path);
-      const previewBtn=document.querySelector('.tabs button:last-child');
-      if(previewBtn)setView('preview-only',previewBtn);
-      const iframeSrc=api('api/raw')+'?path='+encodeURIComponent(path);
-      document.getElementById('preview').innerHTML='<iframe src="'+iframeSrc+'" style="width:100%;min-height:80vh;border:1px solid #30363d;border-radius:6px;background:#0D0D0F" onload="try{this.style.height=this.contentDocument.body.scrollHeight+40+\'px\'}catch(e){}"></iframe>';
-      return;
-    }
     _previewLocked=true;
     fetch(api('api/preview')+'?path='+encodeURIComponent(path)).then(r=>r.json()).then(d=>{
       currentFile=path;
@@ -1978,6 +2130,7 @@ function openFile(path){
       document.getElementById('status').style.color='var(--blue)';
       dirty=false;
       revealFileInTree(path);
+      updateOpenTabBtnVisibility();
       // Force preview-only mode
       const previewBtn=document.querySelector('.tabs button:last-child');
       if(previewBtn)setView('preview-only',previewBtn);
@@ -1999,6 +2152,7 @@ function openFile(path){
     document.getElementById('status').style.color='var(--dim)';
     dirty=false;
     revealFileInTree(path);
+    updateOpenTabBtnVisibility();
     // Defer preview render for faster file switching
     clearTimeout(previewTimer);
     previewTimer=setTimeout(renderPreview,50);
@@ -2296,6 +2450,20 @@ function downloadFile(p){
   a.href=api('api/raw')+'?path='+encodeURIComponent(p)+'&dl=1';
   a.download=p.split('/').pop();
   document.body.appendChild(a);a.click();a.remove();
+}
+
+// Open current file's raw bytes in a new browser tab — useful for HTML slide decks,
+// PDFs, and any standalone document that wants the full viewport.
+function openInNewTab(){
+  if(!currentFile)return;
+  window.open(api('api/raw')+'?path='+encodeURIComponent(currentFile),'_blank','noopener');
+}
+
+function updateOpenTabBtnVisibility(){
+  const btn=document.getElementById('openTabBtn');
+  if(!btn)return;
+  const ext=(currentFile||'').split('.').pop().toLowerCase();
+  btn.style.display=['html','htm','pdf','svg'].includes(ext)?'':'none';
 }
 
 // Rename file
@@ -3574,6 +3742,120 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         self.end_headers()
         self.wfile.write(html.encode())
 
+    def _serve_setup(self, error=''):
+        start_dir = os.path.expanduser('~')
+        html = SETUP_HTML
+        html = html.replace('__ERROR_DISPLAY__', 'block' if error else 'none')
+        html = html.replace('__ERROR_MSG__', error)
+        html = html.replace('__START_DIR__', start_dir.replace('\\', '\\\\').replace("'", "\\'"))
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(html.encode())
+
+    def _serve_host_list(self):
+        qs = parse_qs(urlparse(self.path).query)
+        raw = qs.get('dir', [''])[0] or os.path.expanduser('~')
+        target = os.path.abspath(os.path.expanduser(raw))
+        if not os.path.isdir(target):
+            self._json_resp(404, {'error': 'not a directory', 'path': target}); return
+        try:
+            names = os.listdir(target)
+        except PermissionError:
+            self._json_resp(403, {'error': 'permission denied', 'path': target}); return
+        except OSError as e:
+            self._json_resp(500, {'error': str(e), 'path': target}); return
+        entries = []
+        for name in sorted(names, key=str.lower):
+            if name.startswith('.'):
+                continue
+            full = os.path.join(target, name)
+            try:
+                if os.path.isdir(full):
+                    entries.append({'name': name, 'path': full})
+            except OSError:
+                continue
+        parent = os.path.dirname(target) if target != os.path.dirname(target) else None
+        self._json_resp(200, {'path': target, 'parent': parent, 'entries': entries})
+
+    def _handle_setup_post(self, raw_body):
+        # Re-check guard so this endpoint is not callable after first setup.
+        if not needs_setup():
+            self._redirect('login'); return
+        ctype = self.headers.get('Content-Type', '')
+        if 'application/x-www-form-urlencoded' in ctype:
+            form = parse_qs(raw_body.decode(), keep_blank_values=True)
+            ws_path = form.get('workspace_path', [''])[0].strip()
+            username = form.get('username', [''])[0].strip()
+            display_name = form.get('display_name', [''])[0].strip()
+            password = form.get('password', [''])[0]
+            password2 = form.get('password2', [''])[0]
+        else:
+            try:
+                body = json.loads(raw_body) if raw_body else {}
+            except json.JSONDecodeError:
+                self._serve_setup(error='Invalid request body'); return
+            ws_path = (body.get('workspace_path') or '').strip()
+            username = (body.get('username') or '').strip()
+            display_name = (body.get('display_name') or '').strip()
+            password = body.get('password') or ''
+            password2 = body.get('password2') or ''
+
+        if not ws_path:
+            self._serve_setup(error='请先选择工作目录'); return
+        ws_abs = os.path.abspath(os.path.expanduser(ws_path))
+        if not os.path.isdir(ws_abs):
+            self._serve_setup(error=f'目录不存在: {ws_abs}'); return
+        if not username or not all(c.isalnum() or c in '_-' for c in username):
+            self._serve_setup(error='用户名只能包含字母、数字、下划线、连字符'); return
+        if len(password) < 6:
+            self._serve_setup(error='密码至少 6 位'); return
+        if password != password2:
+            self._serve_setup(error='两次密码不一致'); return
+
+        # Persist config.json (preserve any other keys already there).
+        config_path = os.path.join(_EDITOR_DIR, 'config.json')
+        try:
+            with open(config_path, 'r') as f:
+                existing_cfg = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            existing_cfg = {}
+        existing_cfg.setdefault('workspace', {})['path'] = ws_abs
+        with open(config_path, 'w') as f:
+            json.dump(existing_cfg, f, ensure_ascii=False, indent=2)
+
+        # Persist users.json with admin account.
+        users_data = {
+            'users': {
+                username: {
+                    'name': display_name or username,
+                    'role': 'admin',
+                    'password_hash': hash_password(password),
+                    'paths': ['*'],
+                }
+            },
+            'settings': {'sessionExpireHours': 72},
+        }
+        _save_users(users_data)
+
+        restart_required = (ws_abs != WORKSPACE)
+        if restart_required:
+            block = (
+                '<div class="alert alert-warning text-sm text-left">'
+                '<div><strong>请重启服务以应用新工作目录。</strong>'
+                '<div class="text-xs mt-1 opacity-80">在终端按 <code>Ctrl+C</code> 后重新运行 <code>python3 server.py</code>，'
+                '然后访问 <a class="link link-primary" href="login">登录页</a>。</div></div></div>'
+            )
+        else:
+            block = '<a class="btn btn-primary mt-2" href="login">前往登录</a>'
+        html = SETUP_DONE_HTML.replace('__WORKSPACE__', ws_abs).replace('__RESTART_BLOCK__', block)
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(html.encode())
+
     def _redirect(self, location):
         self.send_response(302)
         self.send_header('Location', location)
@@ -3623,6 +3905,26 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
 
     def do_GET(self):
         path = self.path.split('?')[0].rstrip('/')
+
+        # ==================== SETUP WIZARD ====================
+        if needs_setup():
+            if path == '/setup':
+                self._serve_setup()
+                return
+            if path == '/api/host-list':
+                self._serve_host_list()
+                return
+            self._redirect('setup')
+            return
+        if path == '/setup':
+            self._redirect('./')
+            return
+        if path == '/api/host-list':
+            session = self._check_auth()
+            if not session or session.get('role') != 'admin':
+                self.send_error(403); return
+            self._serve_host_list()
+            return
 
         # ==================== AUTH MIDDLEWARE ====================
         # Public paths: /login, /s/{token}/*
@@ -4053,7 +4355,7 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             walk_roots = SCOPED_DIRS if SCOPED_DIRS else [WORKSPACE]
             for walk_root in walk_roots:
                 for root, dirs, fnames in os.walk(walk_root):
-                    dirs[:] = sorted([d for d in dirs if d not in skip])
+                    dirs[:] = sorted([d for d in dirs if d not in skip and os.path.join(root, d) != DATA_DIR])
                     for f in sorted(fnames):
                         ext = os.path.splitext(f)[1].lower()
                         if ext in VIEWABLE_EXTS:
@@ -4202,7 +4504,7 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             user_paths = session['paths'] if session else ['*']
             refs = []
             for root, dirs, fnames in os.walk(WORKSPACE):
-                dirs[:] = [d for d in dirs if d not in skip]
+                dirs[:] = [d for d in dirs if d not in skip and os.path.join(root, d) != DATA_DIR]
                 for f in fnames:
                     if not f.endswith('.md'):
                         continue
@@ -4286,7 +4588,7 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
             user_paths = session['paths'] if session else ['*']
             dir_list = []
             for root, dirs, fnames in os.walk(WORKSPACE):
-                dirs[:] = sorted([d for d in dirs if d not in skip])
+                dirs[:] = sorted([d for d in dirs if d not in skip and os.path.join(root, d) != DATA_DIR])
                 rel = os.path.relpath(root, WORKSPACE)
                 if rel != '.' and check_path_access(user_paths, rel):
                     dir_list.append(rel)
@@ -4371,6 +4673,14 @@ body{{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemF
         path = self.path.split('?')[0].rstrip('/')
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length)
+
+        # ==================== SETUP WIZARD ====================
+        if needs_setup():
+            if path == '/setup' or path == '/setup/':
+                self._handle_setup_post(raw_body)
+                return
+            self._redirect('setup')
+            return
 
         # ==================== LOGIN ====================
         if path == '/login' or path == '/login/':
