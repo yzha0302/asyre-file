@@ -10,6 +10,7 @@ api_tokens.json
 activity.jsonl
 shares.json
 avatars/
+.asyre-data/
 *.pyc
 __pycache__/
 

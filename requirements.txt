@@ -1,4 +1,16 @@
-# Optional: PDF/Word export support
-# pip install -r requirements.txt
-weasyprint>=60.0
+# Core (server.py imports export.py at module load — these are NOT optional)
 python-docx>=1.0
+markdown>=3.5
+pygments>=2.16
+
+# Preview (server.py imports lazily inside /api/preview)
+mammoth>=1.6        # .docx → HTML preview
+openpyxl>=3.1       # .xlsx / .xls preview
+pymupdf>=1.23       # .pdf preview
+
+# Export (PDF rendering uses Playwright + Chromium)
+playwright>=1.40
+# After install run:  python3 -m playwright install chromium
+
+# AI assist (optional — only needed if you wire up an Anthropic API key)
+# anthropic>=0.40
